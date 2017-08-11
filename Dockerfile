@@ -1,29 +1,22 @@
-# Наследуемся от CentOS 7
+# CentOS 7
 FROM centos:7
 
-# Выбираем рабочую папку
 WORKDIR /root
 
-# Устанавливаем wget и скачиваем Go
-RUN yum install -y wget && \
-    wget https://storage.googleapis.com/golang/go1.8.3.linux-amd64.tar.gz
+RUN yum install -y gcc
+RUN yum install -y gcc-c++
+RUN yum install -y make
+RUN yum install -y cmake
+RUN yum install -y zlib-devel 
 
-# Устанавливаем Go, создаем workspace и папку проекта
-RUN tar -C /usr/local -xzf go1.8.3.linux-amd64.tar.gz && \
-    mkdir go && mkdir go/src && mkdir go/bin && mkdir go/pkg && \
-    mkdir go/src/dumb
+RUN mkdir -p highload/src
+RUN mkdir -p highload/build
 
-# Задаем переменные окружения для работы Go
-ENV PATH=${PATH}:/usr/local/go/bin GOROOT=/usr/local/go GOPATH=/root/go
+COPY src highload/src
+ADD CMakeLists.txt highload/
 
-# Копируем наш исходный main.go внутрь контейнера, в папку go/src/dumb
-ADD src/main.go go/src/dumb
+RUN cd highload/build && cmake .. && make -j4 && make install
 
-# Компилируем и устанавливаем наш сервер
-RUN go build dumb && go install dumb
-
-# Открываем 80-й порт наружу
 EXPOSE 80
 
-# Запускаем наш сервер
-CMD ./go/bin/dumb
+CMD server.out
