@@ -17,9 +17,23 @@ Socket::~Socket()
   close();
 }
 
+Socket::Socket(Socket&& rhs):
+  sock_(rhs.sock_)
+{
+  rhs.sock_ = -1;
+}
+
+Socket& Socket::operator=(Socket&& rhs)
+{
+  sock_ = rhs.sock_;
+  rhs.sock_ = -1;
+
+  return *this;
+}
+
 int Socket::create()
 {
-  if (sock_) {
+  if (sock_ >= 0) {
     return sock_;
   }
   int tmp_sock = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -62,5 +76,15 @@ int Socket::close()
   int res = ::close(sock_);
   sock_ = -1;
   return res;
+}
+
+int Socket::send(const char* buffer, size_t size, int flags)
+{
+  return ::send(sock_, buffer, size, flags);
+}
+
+int Socket::recv(char* buffer, size_t size, int flags)
+{
+  return ::recv(sock_, buffer, size, flags);
 }
 } // namespace tcp

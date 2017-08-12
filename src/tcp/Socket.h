@@ -15,6 +15,8 @@ private:
 public:
   Socket(int sock = -1);
   ~Socket();
+  Socket(Socket&& rhs);
+  Socket& operator=(Socket&& rhs);
   int create();
   int bind(const uint16_t port = 80);
   int listen(int backlog = 128);
@@ -22,6 +24,8 @@ public:
   int shutdown(int how = SHUT_RDWR);
   int close();
   operator int() { return sock_; }
+  int send(const char* buffer, size_t size, int flags = 0);
+  int recv(char* buffer, size_t size, int flags = 0);
 };
 } // namespace tcp
 

@@ -8,12 +8,13 @@
 #include <unistd.h>
 
 #include <common/Types.h>
-#include <tcp/TcpServer.h>
+#include <http/HttpServer.h>
+#include <db/Storage.h>
 
 volatile bool running = false;
 void sig_handler(int signum)
 {
-  fprintf(stderr, "Received signal %d\n", signum);
+  LOG(stderr, "Received signal %d\n", signum);
   running = false;
 }
 
@@ -23,12 +24,15 @@ int main(int argc, char* argv[])
   signal(SIGINT, sig_handler);
   signal(SIGTERM, sig_handler);
 
-  tcp::TcpServer server;
+  http::HttpServer server;
 
   Result res = server.start();
   if (Result::SUCCESS == res) {
     running = true;
   }
+
+  db::Storage storage;
+  storage.load("/tmp/data/data.zip");
 
   while (running) {
     usleep(1000000);

@@ -18,22 +18,27 @@ void TcpServer::acceptFunc()
   Socket clientSock;
   do {
     clientSock = sock_.accept();
-    // todo: add to list
+    acceptSocket(std::move(clientSock));
   } while (int(clientSock) >= 0);
+}
+
+void TcpServer::acceptSocket(Socket&& sock)
+{
+
 }
 
 Result TcpServer::start(const uint16_t port)
 {
   int res = sock_.create();
   if (res < 0) {
-    fprintf(stderr, "Cannot create server socket. errno = %d(%s)\n",
+    LOG(stderr, "Cannot create server socket. errno = %d(%s)\n",
       errno, std::strerror(errno));
     return Result::FAILED;
   }
   res = sock_.bind(port);
   if (res < 0)
   {
-    fprintf(stderr, "Cannot bind server socket. errno = %d(%s)\n",
+    LOG(stderr, "Cannot bind server socket. errno = %d(%s)\n",
       errno, std::strerror(errno));
     return Result::FAILED;
   }
@@ -41,7 +46,7 @@ Result TcpServer::start(const uint16_t port)
   res = sock_.listen();
   if (res < 0)
   {
-    fprintf(stderr, "Cannot bind server socket. errno = %d(%s)\n",
+    LOG(stderr, "Cannot bind server socket. errno = %d(%s)\n",
       errno, std::strerror(errno));
     return Result::FAILED;
   }

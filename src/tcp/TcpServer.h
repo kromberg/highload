@@ -20,6 +20,7 @@ private:
 
 private:
   void acceptFunc();
+  virtual void acceptSocket(Socket&& sock);
 
 public:
   TcpServer();
