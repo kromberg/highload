@@ -26,13 +26,18 @@ RUN git clone https://github.com/miloyip/rapidjson.git && \
     cmake .. && \
     make -j4 && \
     make install
+RUN wget https://github.com/01org/tbb/archive/2017_U7.tar.gz
+RUN tar xf 2017_U7.tar.gz && \
+    rm 2017_U7.tar.gz && \
+    cd tbb-2017_U7 && \
+    gmake
 
 RUN mkdir -p highload/src
 RUN mkdir -p highload/build
 
 # testing
-RUN mkdir -p /tmp/data
-ADD data.zip /tmp/data/
+#RUN mkdir -p /tmp/data
+#ADD data.zip /tmp/data/
 
 COPY src highload/src
 ADD CMakeLists.txt highload/
@@ -40,6 +45,7 @@ ADD CMakeLists.txt highload/
 RUN cd highload/build && cmake .. && make -j4 && make install
 
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/usr/lib:/usr/lib64
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/root/tbb-2017_U7/build/linux_intel64_gcc_cc4.8.5_libc2.17_kernel4.9.36_release
 
 EXPOSE 80
 

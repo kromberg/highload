@@ -1,6 +1,7 @@
 #ifndef _HTTP_SERVER_H
 #define _HTTP_SERVER_H
 
+#include <db/Storage.h>
 #include <tcp/TcpServer.h>
 
 #include "Types.h"
@@ -9,6 +10,8 @@ namespace http
 {
 class HttpServer : public tcp::TcpServer
 {
+private:
+  db::StoragePtr storage_;
 private:
   void handleRequest(tcp::Socket&& sock);
   virtual void acceptSocket(tcp::Socket&& sock) override;
@@ -20,7 +23,7 @@ private:
   void send(tcp::Socket& sock, const char* buffer, int size);
 
 public:
-  HttpServer();
+  HttpServer(db::StoragePtr& storage);
   ~HttpServer();
 };
 } // namespace http

@@ -2,6 +2,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "StateMachine.h"
 #include "HttpServer.h"
 
 namespace http
@@ -10,14 +11,15 @@ namespace http
 #define RESPONSE_HEADER_FORMAT \
   "HTTP/1.1 %d %s\n"\
   "Content-Type: application/json; charset=UTF-8\n"\
-  "Connection: Closed\n"\
+  "Connection: close\n"\
   "Content-Length: %zu\n"\
   "\n"\
 
 #define RESPONSE_HEADER_ESTIMATED_SIZE 94 + 3 + 64 + 4
 
-HttpServer::HttpServer():
-  tcp::TcpServer()
+HttpServer::HttpServer(db::StoragePtr& storage):
+  tcp::TcpServer(),
+  storage_(storage)
 {}
 
 HttpServer::~HttpServer()
@@ -38,20 +40,30 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
     TABLE1,
     ID,
     TABLE2,
-    PARAMS
+    END,
   } state = State::TABLE1;
+
+  size_t end = url.find('?', 1);
+  if (std::string::npos != end) {
+    req.params_ = url.substr(end + 1);
+    LOG(stderr, "Requst params: %s\n", req.params_.c_str());
+  }
 
   size_t pos1, pos2 = 0;
   do
   {
     pos1 = pos2 + 1;
     pos2 = url.find('/', pos1);
+    if (std::string::npos == pos2) {
+      pos2 = end;
+    }
+    size_t size = (std::string::npos == pos2) ? std::string::npos : (pos2 - pos1);
 
     switch (state) {
       case State::TABLE1:
       case State::TABLE2:
       {
-        auto it = strToTableMap.find(url.substr(pos1, pos2 - pos1));
+        auto it = strToTableMap.find(url.substr(pos1, size));
         if (strToTableMap.end() == it) {
           return HTTPCode::BAD_REQ;
         }
@@ -60,30 +72,29 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
           state = State::ID;
         } else {
           req.table2_ = it->second;
-          state = State::PARAMS;
+          state = State::END;
         }
         break;
       }
       case State::ID:
       {
-        std::string id = url.substr(pos1, pos2 - pos1);
+        std::string id = url.substr(pos1, size);
         if ("new" == id) {
           req.id_ = -1;
         } else {
           try {
             req.id_ = std::stoi(id);
           } catch (std::invalid_argument &e) {
-            return HTTPCode::BAD_REQ;
+            return HTTPCode::NOT_FOUND;
           }
         }
         break;
       }
-      case State::PARAMS:
-        req.params_ = url.substr(pos1);
+      case State::END:
         break;
     }
 
-  } while (pos2 != std::string::npos);
+  } while (pos2 != end);
 
   return HTTPCode::OK;
 }
@@ -104,6 +115,7 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, const std::string& reqMeth
   pos1 = pos2 + 1;
   pos2 = reqMethod.find(' ', pos1);
   std::string url = reqMethod.substr(pos1, pos2 - pos1);
+
   HTTPCode code = parseURL(req, url);
   if (HTTPCode::OK != code) {
     return code;
@@ -132,7 +144,11 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
     size_t pos = header.find(':');
     std::string name = header.substr(0, pos);
     if ("Content-Length" == name) {
-      contentLength = std::stoi(header.substr(pos + 1));
+      try {
+        contentLength = std::stoi(header.substr(pos + 1));
+      } catch (std::invalid_argument& e) {
+        return HTTPCode::BAD_REQ;
+      }
     }
   } while (!header.empty());
 
@@ -159,25 +175,46 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
       buffer[res] = 0;
       reqStream << buffer;
     }
-  } while (res >= 0);
+  } while (res > 0);
+  LOG(stderr, "Received request: %s\n", reqStream.str().c_str());
 
   Request req;
   HTTPCode code = parseRequest(req, reqStream);
   if (HTTPCode::OK != code) {
-    char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE];
-    int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT,
-      code, httpCodeToStr(code), size_t(0));
+    char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + 2];
+    int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
+      code, httpCodeToStr(code), size_t(2), "{}");
 
     send(sock, response, size);
-
     return ;
   }
 
-  // TODO: go to db and retreive answer
+  StateMachine::Handler handler = StateMachine::getHandler(req);
+  if (!handler) {
+    char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + 2];
+    int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
+      code, httpCodeToStr(code), size_t(2), "{}");
 
-  char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + 2];
+    send(sock, response, size);
+    return ;
+  }
+
+  std::string body;
+  code = handler(body, *storage_, req);
+  if (HTTPCode::OK != code) {
+    char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + 2];
+    int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
+      code, httpCodeToStr(code), size_t(2), "{}");
+
+    send(sock, response, size);
+    return ;
+  }
+
+  char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + body.size()];
   int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
-    code, httpCodeToStr(code), size_t(2), "{}");
+    code, httpCodeToStr(code), body.size(), body.c_str());
+
+  LOG(stderr, "Sending response %s\n", response);
 
   send(sock, response, size);
 }
@@ -190,7 +227,7 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
 
   int offset = 0;
   while (offset < size) {
-    int sent = sock.send(buffer, size - offset);
+    int sent = sock.send(buffer + offset, size - offset);
     if (sent < 0) {
       break ;
     }

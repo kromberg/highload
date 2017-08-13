@@ -7,17 +7,19 @@ namespace http
 {
 enum class Type
 {
-  NONE,
+  NONE = 0,
   POST,
   GET,
+  MAX,
 };
 enum class Table
 {
-  NONE,
+  NONE = 0,
   USERS,
   LOCATIONS,
   VISITS,
   AVG,
+  MAX,
 };
 
 enum HTTPCode

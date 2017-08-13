@@ -7,6 +7,7 @@ enum class Result
 {
   SUCCESS,
   FAILED,
+  NOT_FOUND,
 };
 } // namespace common
 

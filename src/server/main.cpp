@@ -24,15 +24,14 @@ int main(int argc, char* argv[])
   signal(SIGINT, sig_handler);
   signal(SIGTERM, sig_handler);
 
-  http::HttpServer server;
+  db::StoragePtr storage(new db::Storage);
+  storage->load("/tmp/data/data.zip");
 
+  http::HttpServer server(storage);
   Result res = server.start();
   if (Result::SUCCESS == res) {
     running = true;
   }
-
-  db::Storage storage;
-  storage.load("/tmp/data/data.zip");
 
   while (running) {
     usleep(1000000);

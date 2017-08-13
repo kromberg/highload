@@ -16,15 +16,12 @@ TcpServer::~TcpServer()
 void TcpServer::acceptFunc()
 {
   Socket clientSock;
+  int rawSock;
   do {
     clientSock = sock_.accept();
+    rawSock = int(clientSock);
     acceptSocket(std::move(clientSock));
-  } while (int(clientSock) >= 0);
-}
-
-void TcpServer::acceptSocket(Socket&& sock)
-{
-
+  } while (rawSock >= 0);
 }
 
 Result TcpServer::start(const uint16_t port)

@@ -1,11 +1,9 @@
 #include <cstring>
-#include <sstream>
+#include <unordered_set>
 
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#include <zip.h>
 
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
@@ -15,19 +13,18 @@
 namespace db
 {
 
-static void safe_create_dir(const char *dir)
-{
-  if (mkdir(dir, 0755) < 0) {
-    if (errno != EEXIST) {
-      perror(dir);
-      exit(1);
-    }
-  }
-}
-
 Result Storage::load(const std::string& path)
 {
-  char buf[1024];
+  static std::string usersFilePrefix("users_");
+  static std::string locationsFilePrefix("locations_");
+  static std::string visitsFilePrefix("visits_");
+
+  std::unordered_map<std::string, ZipStats> stats = 
+  {
+    {usersFilePrefix,     ZipStats() },
+    {locationsFilePrefix, ZipStats() },
+    {visitsFilePrefix,    ZipStats() },
+  };
 
   int err = 0;
   zip *archive = zip_open(path.c_str(), 0, &err);
@@ -41,54 +38,32 @@ Result Storage::load(const std::string& path)
     if (res < 0) {
       continue;
     }
-    LOG(stderr, "==================\n");
-    int len = strlen(stat.name);
-    LOG(stderr, "Name: [%s], ", stat.name);
-    LOG(stderr, "Size: [%lu], ", stat.size);
-    LOG(stderr, "mtime: [%u]\n", (unsigned int)stat.mtime);
-    if (stat.name[len - 1] == '/' ||
-        stat.name[len - 1] == '\\') {
-      safe_create_dir(stat.name);
-      continue ;
-    }
-
-    struct zip_file* zf = zip_fopen_index(archive, i, 0);
-    if (!zf) {
-      continue;
-    }
-
-    {
-      std::ostringstream ss;
-      uint64_t sum = 0;
-      while (sum != stat.size) {
-        
-        len = zip_fread(zf, buf, sizeof(buf));
-        if (len < 0) {
-          break;
-        }
-        ss.write(buf, len);
-        sum += len;
-      }
-      zip_fclose(zf);
-
-      {
-        // parse json
-        using namespace rapidjson;
-        Document document;
-        document.Parse(ss.str().c_str());
-        if (0 == strncmp(stat.name, "users_", 6)) {
-          if (document.HasMember("users")) {
-            const Value& users = document["users"];
-            for (auto it = users.Begin(), end = users.End(); it != end; ++it) {
-              // LOG(stderr, "%s\n", (*it)["first_name"].GetString());
-            }
-          }
-        }
+    std::string filename(stat.name);
+    for (auto& statEntry : stats) {
+      if (0 == filename.compare(0, statEntry.first.size(), statEntry.first)) {
+        statEntry.second.emplace_back(std::move(stat));
+        break;
       }
     }
   }
 
+  loadFiles(users_, archive, stats[usersFilePrefix], "users");
+  loadFiles(locations_, archive, stats[locationsFilePrefix], "locations");
+  loadFiles(visits_, archive, stats[visitsFilePrefix], "visits");
+
   return Result::SUCCESS;
 }
+
+Result Storage::getUser(std::string& resp, const int32_t id)
+{
+  tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
+  auto it = users_.find(id);
+  if (users_.end() == it) {
+    return Result::NOT_FOUND;
+  }
+  resp = std::move(it->second.getJson(id));
+  return Result::SUCCESS;
+}
+
 
 } // namespace db
