@@ -40,7 +40,6 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
     TABLE1,
     ID,
     TABLE2,
-    END,
   } state = State::TABLE1;
 
   size_t end = url.find('?', 1);
@@ -72,7 +71,6 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
           state = State::ID;
         } else {
           req.table2_ = it->second;
-          state = State::END;
         }
         break;
       }
@@ -83,15 +81,13 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
           req.id_ = -1;
         } else {
           try {
-            req.id_ = std::stoi(id);
+            req.id_ = std::stoul(id);
           } catch (std::invalid_argument &e) {
             return HTTPCode::NOT_FOUND;
           }
         }
         break;
       }
-      case State::END:
-        break;
     }
 
   } while (pos2 != end);
@@ -178,38 +174,32 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
   } while (res > 0);
   LOG(stderr, "Received request: %s\n", reqStream.str().c_str());
 
+  std::string body("{}");
   Request req;
   HTTPCode code = parseRequest(req, reqStream);
   if (HTTPCode::OK != code) {
-    char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + 2];
-    int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
-      code, httpCodeToStr(code), size_t(2), "{}");
-
-    send(sock, response, size);
+    sendResponse(sock, code, body);
     return ;
   }
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
-    char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + 2];
-    int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
-      code, httpCodeToStr(code), size_t(2), "{}");
-
-    send(sock, response, size);
+    LOG(stderr, "There is no handler for requst\n");
+    sendResponse(sock, code, body);
     return ;
   }
 
-  std::string body;
   code = handler(body, *storage_, req);
   if (HTTPCode::OK != code) {
-    char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + 2];
-    int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
-      code, httpCodeToStr(code), size_t(2), "{}");
-
-    send(sock, response, size);
+    sendResponse(sock, code, body);
     return ;
   }
 
+  sendResponse(sock, code, body);
+}
+
+void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code, const std::string& body)
+{
   char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + body.size()];
   int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
     code, httpCodeToStr(code), body.size(), body.c_str());
@@ -217,6 +207,7 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
   LOG(stderr, "Sending response %s\n", response);
 
   send(sock, response, size);
+  delete[] response;
 }
 
 void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)

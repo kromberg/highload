@@ -20,6 +20,7 @@ private:
   HTTPCode parseRequestMethod(Request& req, const std::string& reqMethod);
   HTTPCode parseRequest(Request& req, std::stringstream& reqStream);
 
+  void sendResponse(tcp::Socket& sock, const HTTPCode code, const std::string& body);
   void send(tcp::Socket& sock, const char* buffer, int size);
 
 public:
