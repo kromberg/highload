@@ -1,29 +1,52 @@
-# Наследуемся от CentOS 7
+# CentOS 7
 FROM centos:7
 
-# Выбираем рабочую папку
 WORKDIR /root
 
-# Устанавливаем wget и скачиваем Go
-RUN yum install -y wget && \
-    wget https://storage.googleapis.com/golang/go1.8.3.linux-amd64.tar.gz
+RUN yum install -y gcc
+RUN yum install -y gcc-c++
+RUN yum install -y make
+RUN yum install -y cmake
+RUN yum install -y wget
+RUN yum install -y zlib-devel
+RUN yum install -y perl
+RUN wget https://nih.at/libzip/libzip-1.2.0.tar.gz
+RUN tar xf libzip-1.2.0.tar.gz && \
+    rm libzip-1.2.0.tar.gz && \
+    cd libzip-1.2.0 && \
+    ./configure && \
+    make -j4 && \
+    make install
+RUN yum install -y git
+RUN git clone https://github.com/miloyip/rapidjson.git && \
+    cd rapidjson && \
+    git checkout tags/v1.1.0 && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make -j4 && \
+    make install
+RUN wget https://github.com/01org/tbb/archive/2017_U7.tar.gz
+RUN tar xf 2017_U7.tar.gz && \
+    rm 2017_U7.tar.gz && \
+    cd tbb-2017_U7 && \
+    gmake
 
-# Устанавливаем Go, создаем workspace и папку проекта
-RUN tar -C /usr/local -xzf go1.8.3.linux-amd64.tar.gz && \
-    mkdir go && mkdir go/src && mkdir go/bin && mkdir go/pkg && \
-    mkdir go/src/dumb
+RUN mkdir -p highload/src
+RUN mkdir -p highload/build
 
-# Задаем переменные окружения для работы Go
-ENV PATH=${PATH}:/usr/local/go/bin GOROOT=/usr/local/go GOPATH=/root/go
+# testing
+#RUN mkdir -p /tmp/data
+#ADD data.zip /tmp/data/
 
-# Копируем наш исходный main.go внутрь контейнера, в папку go/src/dumb
-ADD src/main.go go/src/dumb
+COPY src highload/src
+ADD CMakeLists.txt highload/
 
-# Компилируем и устанавливаем наш сервер
-RUN go build dumb && go install dumb
+RUN cd highload/build && cmake .. && make -j4 && make install
 
-# Открываем 80-й порт наружу
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/usr/lib:/usr/lib64
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/root/tbb-2017_U7/build/linux_intel64_gcc_cc4.8.5_libc2.17_kernel4.9.36_release
+
 EXPOSE 80
 
-# Запускаем наш сервер
-CMD ./go/bin/dumb
+CMD server.out
