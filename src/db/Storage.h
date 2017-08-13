@@ -9,6 +9,8 @@
 
 #include <tbb/spin_rw_mutex.h>
 
+#include <rapidjson/document.h>
+
 #include <zip.h>
 
 #include <common/Types.h>
@@ -42,7 +44,18 @@ private:
     const std::string& arrayName);
 public:
   Result load(const std::string& path);
+
+  Result addUser(const rapidjson::Value& jsonVal);
+  Result addLocation(const rapidjson::Value& jsonVal);
+  Result addVisit(const rapidjson::Value& jsonVal);
+
+  Result updateUser(const int32_t id, const rapidjson::Value& jsonVal);
+  Result updateLocation(const int32_t id, const rapidjson::Value& jsonVal);
+  Result updateVisit(const int32_t id, const rapidjson::Value& jsonVal);
+
   Result getUser(std::string& resp, const int32_t id);
+  Result getLocation(std::string& resp, const int32_t id);
+  Result getVisit(std::string& resp, const int32_t id);
 };
 
 typedef std::shared_ptr<Storage> StoragePtr;

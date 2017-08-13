@@ -54,6 +54,90 @@ Result Storage::load(const std::string& path)
   return Result::SUCCESS;
 }
 
+Result Storage::addUser(const rapidjson::Value& jsonVal)
+{
+  tbb::spin_rw_mutex::scoped_lock l(usersGuard_, true);
+  if (!jsonVal.HasMember("id")) {
+    return Result::FAILED;
+  }
+  int32_t id = jsonVal["id"].GetInt();
+  users_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(id),
+    std::forward_as_tuple(jsonVal));
+
+  return Result::SUCCESS;
+}
+
+Result Storage::addLocation(const rapidjson::Value& jsonVal)
+{
+  tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, true);
+  if (!jsonVal.HasMember("id")) {
+    return Result::FAILED;
+  }
+  int32_t id = jsonVal["id"].GetInt();
+  locations_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(id),
+    std::forward_as_tuple(jsonVal));
+
+  return Result::SUCCESS;
+}
+
+Result Storage::addVisit(const rapidjson::Value& jsonVal)
+{
+  tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, true);
+  if (!jsonVal.HasMember("id")) {
+    return Result::FAILED;
+  }
+  int32_t id = jsonVal["id"].GetInt();
+  visits_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(id),
+    std::forward_as_tuple(jsonVal));
+
+  return Result::SUCCESS;
+}
+
+Result Storage::updateUser(const int32_t id, const rapidjson::Value& jsonVal)
+{
+  tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
+  auto it = users_.find(id);
+  if (users_.end() == it) {
+    return Result::NOT_FOUND;
+  }
+  l.upgrade_to_writer();
+  it->second.update(jsonVal);
+
+  return Result::SUCCESS;
+}
+
+Result Storage::updateLocation(const int32_t id, const rapidjson::Value& jsonVal)
+{
+  tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
+  auto it = locations_.find(id);
+  if (locations_.end() == it) {
+    return Result::NOT_FOUND;
+  }
+  l.upgrade_to_writer();
+  it->second.update(jsonVal);
+
+  return Result::SUCCESS;
+}
+
+Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
+{
+  tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, false);
+  auto it = visits_.find(id);
+  if (visits_.end() == it) {
+    return Result::NOT_FOUND;
+  }
+  l.upgrade_to_writer();
+  it->second.update(jsonVal);
+
+  return Result::SUCCESS;
+}
+
 Result Storage::getUser(std::string& resp, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
@@ -65,5 +149,26 @@ Result Storage::getUser(std::string& resp, const int32_t id)
   return Result::SUCCESS;
 }
 
+Result Storage::getLocation(std::string& resp, const int32_t id)
+{
+  tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
+  auto it = locations_.find(id);
+  if (locations_.end() == it) {
+    return Result::NOT_FOUND;
+  }
+  resp = std::move(it->second.getJson(id));
+  return Result::SUCCESS;
+}
+
+Result Storage::getVisit(std::string& resp, const int32_t id)
+{
+  tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, false);
+  auto it = visits_.find(id);
+  if (visits_.end() == it) {
+    return Result::NOT_FOUND;
+  }
+  resp = std::move(it->second.getJson(id));
+  return Result::SUCCESS;
+}
 
 } // namespace db

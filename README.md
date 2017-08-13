@@ -1,29 +1,7 @@
 # README #
 
-This README would normally document whatever steps are necessary to get your application up and running.
-
-### What is this repository for? ###
-
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
-
-### How do I get set up? ###
-
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
-
-### Contribution guidelines ###
-
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+docker build -t cpp_highload
+docker run --rm -p 8080:80 -t cpp_highload
+docker login stor.highloadcup.ru
+docker tag dumb stor.highloadcup.ru/travels/sharp_wasp
+docker push stor.highloadcup.ru/travels/sharp_wasp
