@@ -56,6 +56,8 @@ public:
   Result getUser(std::string& resp, const int32_t id);
   Result getLocation(std::string& resp, const int32_t id);
   Result getVisit(std::string& resp, const int32_t id);
+
+  Result getUserVisits(std::string& resp, const int32_t id, std::string& params);
 };
 
 typedef std::shared_ptr<Storage> StoragePtr;

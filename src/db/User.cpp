@@ -56,4 +56,33 @@ std::string User::getJson(int32_t id)
   str += "}";
   return str;
 }
+
+std::string User::getJsonVisits(std::string& params)
+{
+  thread_local std::string str;
+
+  struct Parameters
+  {
+    std::pair<int32_t, int32_t> date;
+  };
+  // TODO: parse parameters
+
+  if (visits_.empty()) {
+    return std::string();
+  }
+
+  str.reserve(512);
+  str.clear();
+  str += "{";
+  str += "\"visits\":[";
+  for (auto visit : visits_) {
+    str += "{";
+    str += "\"id\":" + std::to_string(visit.first);
+    str += "},";
+  }
+  str.pop_back();
+  str += "]";
+  str += "}";
+  return str;
+}
 } // namespace db

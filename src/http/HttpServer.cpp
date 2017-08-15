@@ -126,17 +126,23 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
 
   std::string reqMethod;
   getline(reqStream, reqMethod);
+  if (reqMethod.empty()) {
+    return HTTPCode::BAD_REQ;
+  }
   HTTPCode code = parseRequestMethod(req, reqMethod);
   if (HTTPCode::OK != code) {
     return code;
   }
 
   std::string header;
-  int contentLength = -1;
-  do
+  int contentLength = 0;
+  for (;;)
   {
     header.clear();
     getline(reqStream, header);
+    if (header.empty()) {
+      break;
+    }
     size_t pos = header.find(':');
     std::string name = header.substr(0, pos);
     if ("Content-Length" == name) {
@@ -146,10 +152,10 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
         return HTTPCode::BAD_REQ;
       }
     }
-  } while (!header.empty());
+  }
 
-  if (contentLength < 0) {
-    return HTTPCode::BAD_REQ;
+  if (0 == contentLength) {
+    return HTTPCode::OK;
   }
 
   std::string content;
@@ -203,8 +209,6 @@ void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code, const std:
   char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + body.size()];
   int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
     code, httpCodeToStr(code), body.size(), body.c_str());
-
-  LOG(stderr, "Sending response %s\n", response);
 
   send(sock, response, size);
   delete[] response;

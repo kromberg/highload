@@ -178,7 +178,13 @@ HTTPCode StateMachine::getVisit(std::string& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::getUserVisits(std::string& resp, db::Storage& storage, Request& req)
 {
-  return HTTPCode::NOT_FOUND;
+  Result res = storage.getUserVisits(resp, req.id_, req.params_);
+  if (Result::NOT_FOUND == res) {
+    return HTTPCode::NOT_FOUND;
+  } else if (Result::SUCCESS != res) {
+    return HTTPCode::BAD_REQ;
+  }
+  return HTTPCode::OK;
 }
 
 HTTPCode StateMachine::getLocationScore(std::string& resp, db::Storage& storage, Request& req)
