@@ -136,6 +136,7 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
 
   std::string header;
   int contentLength = 0;
+  bool hasContentType = false;
   for (;;)
   {
     header.clear();
@@ -151,10 +152,18 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
       } catch (std::invalid_argument& e) {
         return HTTPCode::BAD_REQ;
       }
+    } else if ("Content-Type" == name) {
+      hasContentType = true;
     }
   }
 
-  if (0 == contentLength) {
+  if (!hasContentType) {
+    return HTTPCode::BAD_REQ;
+  }
+
+  if (contentLength < 0) {
+    return HTTPCode::BAD_REQ;
+  } else if (0 == contentLength) {
     return HTTPCode::OK;
   }
 
@@ -178,7 +187,7 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
       reqStream << buffer;
     }
   } while (res > 0);
-  LOG(stderr, "Received request: %s\n", reqStream.str().c_str());
+  // LOG(stderr, "Received request: %s\n", reqStream.str().c_str());
 
   std::string body("{}");
   Request req;
@@ -187,6 +196,7 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
     sendResponse(sock, code, body);
     return ;
   }
+  req.dump();
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
@@ -213,7 +223,6 @@ void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code, const std:
   response[size] = '\0';
   ++ size;
 
-  LOG(stderr, "Body: %s\n", body.c_str());
   LOG(stderr, "Sending response: %s\n", response);
 
   send(sock, response, size);
