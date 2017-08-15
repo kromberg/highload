@@ -101,9 +101,9 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, const std::string& reqMeth
   static std::string GET_STR = "GET";
   size_t pos1 = 0, pos2 = reqMethod.find(' ');
   std::string typeStr = reqMethod.substr(pos1, pos2);
-  if (0 == reqMethod.compare(POST_STR)) {
+  if (0 == typeStr.compare(POST_STR)) {
     req.type_ = Type::POST;
-  } else if (0 == reqMethod.compare(GET_STR)) {
+  } else if (0 == typeStr.compare(GET_STR)) {
     req.type_ = Type::GET;
   } else {
     req.type_ = Type::NONE;
@@ -206,9 +206,15 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
 
 void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code, const std::string& body)
 {
-  char* response = new char[RESPONSE_HEADER_ESTIMATED_SIZE + body.size()];
-  int size = snprintf(response, RESPONSE_HEADER_ESTIMATED_SIZE, RESPONSE_HEADER_FORMAT "%s",
+  size_t estimatedSize = RESPONSE_HEADER_ESTIMATED_SIZE + body.size() + 1;
+  char* response = new char[estimatedSize];
+  int size = snprintf(response, estimatedSize, RESPONSE_HEADER_FORMAT "%s",
     code, httpCodeToStr(code), body.size(), body.c_str());
+  response[size] = '\0';
+  ++ size;
+
+  LOG(stderr, "Body: %s\n", body.c_str());
+  LOG(stderr, "Sending response: %s\n", response);
 
   send(sock, response, size);
   delete[] response;

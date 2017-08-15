@@ -37,7 +37,7 @@ std::string Location::getJson(int32_t id)
   str += "\"place\":\"" + place + "\",";
   str += "\"country\":\"" + country + "\",";
   str += "\"city\":\"" + city + "\",";
-  str += "\"distance\":" + std::to_string(distance) + ",";
+  str += "\"distance\":" + std::to_string(distance);
   str += "}";
   return str;
 }

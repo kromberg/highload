@@ -52,7 +52,7 @@ std::string User::getJson(int32_t id)
   str += "\"first_name\":\"" + first_name + "\",";
   str += "\"last_name\":\"" + last_name + "\",";
   str += "\"birth_date\":" + std::to_string(birth_date) + ",";
-  str += "\"gender\":\"" + std::string(gender ? "m" : "f") + "\",";
+  str += "\"gender\":\"" + std::string(gender ? "m" : "f") + "\"";
   str += "}";
   return str;
 }

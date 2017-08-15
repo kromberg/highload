@@ -37,7 +37,7 @@ std::string Visit::getJson(int32_t id)
   str += "\"location\":" + std::to_string(location) + ",";
   str += "\"user\":" + std::to_string(user) + ",";
   str += "\"visited_at\":" + std::to_string(visited_at) + ",";
-  str += "\"mark\":" + std::to_string(mark) + ",";
+  str += "\"mark\":" + std::to_string(mark);
   str += "}";
   return str;
 }

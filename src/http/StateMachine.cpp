@@ -27,13 +27,13 @@ StateMachine::Handler StateMachine::handlersMatrix_[size_t(Type::MAX)][size_t(Ta
   {
     // NONE USERS LOCATIONS VISITS AVG
     // NONE
-    { emptyH(), StateMachine::addOrUpdateUser, StateMachine::addOrUpdateLocation, StateMachine::addOrUpdateVisit, emptyH(), },
+    { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
     // USERS
-    { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
+    { StateMachine::addOrUpdateUser, emptyH(), emptyH(), emptyH(), emptyH(), },
     // LOCATIONS
-    { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
+    { StateMachine::addOrUpdateLocation, emptyH(), emptyH(), emptyH(), emptyH(), },
     // VISITS
-    { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
+    { StateMachine::addOrUpdateVisit, emptyH(), emptyH(), emptyH(), emptyH(), },
     // AVG
     { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
   },
@@ -41,15 +41,15 @@ StateMachine::Handler StateMachine::handlersMatrix_[size_t(Type::MAX)][size_t(Ta
   {
     // NONE USERS LOCATIONS VISITS AVG
     // NONE
-    { emptyH(), StateMachine::getUser, StateMachine::getLocation, StateMachine::getVisit, emptyH(), },
+    { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
     // USERS
-    { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
+    { StateMachine::getUser, emptyH(), emptyH(), StateMachine::getUserVisits, emptyH(), },
     // LOCATIONS
-    { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
+    { StateMachine::getLocation, emptyH(), emptyH(), emptyH(), StateMachine::getLocationScore, },
     // VISITS
-    { emptyH(), StateMachine::getUserVisits, emptyH(), emptyH(), emptyH(), },
+    { StateMachine::getVisit, emptyH(), emptyH(), emptyH(), emptyH(), },
     // AVG
-    { emptyH(), StateMachine::getLocationScore, emptyH(), emptyH(), emptyH(), },
+    { emptyH(), emptyH(), emptyH(), emptyH(), emptyH(), },
   },
 };
 
