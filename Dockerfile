@@ -35,10 +35,6 @@ RUN tar xf 2017_U7.tar.gz && \
 RUN mkdir -p highload/src
 RUN mkdir -p highload/build
 
-# testing
-#RUN mkdir -p /tmp/data
-#ADD data.zip /tmp/data/
-
 COPY src highload/src
 ADD CMakeLists.txt highload/
 
