@@ -157,14 +157,19 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
     }
   }
 
-  if (!hasContentType) {
+  // post must have content
+  if (req.type_ == Type::POST && !hasContentType) {
     return HTTPCode::BAD_REQ;
   }
 
   if (contentLength < 0) {
     return HTTPCode::BAD_REQ;
   } else if (0 == contentLength) {
-    return HTTPCode::OK;
+    if (req.type_ == Type::GET) {
+      return HTTPCode::OK;
+    } else {
+      return HTTPCode::BAD_REQ;
+    }
   }
 
   std::string content;
@@ -187,7 +192,7 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
       reqStream << buffer;
     }
   } while (res > 0);
-  // LOG(stderr, "Received request: %s\n", reqStream.str().c_str());
+  LOG(stderr, "Received request: %s\n", reqStream.str().c_str());
 
   std::string body("{}");
   Request req;

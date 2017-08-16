@@ -11,10 +11,10 @@ enum class Result
 };
 } // namespace common
 
-#if 1
+#ifndef NDEBUG
 # define LOG fprintf
 #else
-# define LOG(...) (void)
+# define LOG(...)
 #endif
 
 #endif // _TYPES_H_

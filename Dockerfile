@@ -38,6 +38,7 @@ RUN mkdir -p highload/build
 COPY src highload/src
 ADD CMakeLists.txt highload/
 
+#RUN cd highload/build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4 && make install
 RUN cd highload/build && cmake .. && make -j4 && make install
 
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/usr/lib:/usr/lib64
