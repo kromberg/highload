@@ -1,6 +1,7 @@
 #include <rapidjson/stringbuffer.h>
 
 #include "Visit.h"
+#include "Location.h"
 
 namespace db
 {
@@ -8,6 +9,21 @@ Visit::Visit(const rapidjson::Value& jsonVal)
 {
   location = jsonVal["location"].GetInt();
   user = jsonVal["user"].GetInt();
+  visited_at = jsonVal["visited_at"].GetInt();
+  mark = jsonVal["mark"].GetInt();
+}
+
+Visit::Visit(
+  const int32_t locationId,
+  const int32_t userId,
+  Location* _location,
+  User* _user,
+  const rapidjson::Value& jsonVal):
+  location(locationId),
+  user(userId),
+  location_(_location),
+  user_(_user)
+{
   visited_at = jsonVal["visited_at"].GetInt();
   mark = jsonVal["mark"].GetInt();
 }
@@ -29,7 +45,7 @@ void Visit::update(const rapidjson::Value& jsonVal)
 }
 std::string Visit::getJson(int32_t id)
 {
-  thread_local std::string str;
+  std::string str;
   str.reserve(512);
   str.clear();
   str += "{";

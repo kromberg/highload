@@ -8,6 +8,8 @@
 
 namespace db
 {
+struct User;
+struct Location;
 struct Visit
 {
   int32_t location;
@@ -15,7 +17,16 @@ struct Visit
   int32_t visited_at;
   uint16_t mark;
 
+  Location* location_;
+  User* user_;
+
   Visit(const rapidjson::Value& jsonVal);
+  Visit(
+    const int32_t locationId,
+    const int32_t userId,
+    Location* _location,
+    User* _user,
+    const rapidjson::Value& jsonVal);
   void update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
 };

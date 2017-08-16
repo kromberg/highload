@@ -1,3 +1,6 @@
+#include <sstream>
+#include <iomanip>
+
 #include <rapidjson/stringbuffer.h>
 
 #include "Location.h"
@@ -29,7 +32,7 @@ void Location::update(const rapidjson::Value& jsonVal)
 }
 std::string Location::getJson(int32_t id)
 {
-  thread_local std::string str;
+  std::string str;
   str.reserve(512);
   str.clear();
   str += "{";
@@ -41,4 +44,33 @@ std::string Location::getJson(int32_t id)
   str += "}";
   return str;
 }
+
+static std::string to_string(const double val)
+{
+  std::ostringstream ss;
+  ss << std::setprecision(6) << val;
+  return ss.str();
+}
+
+std::string Location::getJsonAvgMark(std::string& params)
+{
+  std::string str;
+  str.reserve(32);
+  double avg = 0;
+  size_t count = 0;
+  for (auto& visitEntry : visits_) {
+    Visit* visit = visitEntry.second.second;
+    avg += visit->mark;
+    ++ count;
+  }
+  if (count) {
+    avg /= count;
+  }
+
+  str += "{";
+  str += "\"avg\":" + db::to_string(avg);
+  str += "}";
+  return str;
+}
+
 } // namespace db

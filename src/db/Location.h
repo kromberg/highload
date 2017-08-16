@@ -24,6 +24,7 @@ struct Location
   Location(const rapidjson::Value& jsonVal);
   void update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
+  std::string getJsonAvgMark(std::string& params);
 };
 } // namespace db
 #endif // _DB_LOCATION_H_

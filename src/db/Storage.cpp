@@ -47,31 +47,129 @@ Result Storage::load(const std::string& path)
     }
   }
 
-  loadFiles(users_, archive, stats[usersFilePrefix], "users");
-  loadFiles(locations_, archive, stats[locationsFilePrefix], "locations");
-  loadFiles(visits_, archive, stats[visitsFilePrefix], "visits");
+  loadFiles(archive, stats[usersFilePrefix], "users",
+    [&] (const rapidjson::Value& jsonVal) -> void {
+      if (!jsonVal.HasMember("id")) {
+        return ;
+      }
+      const int32_t id = jsonVal["id"].GetInt();
+      users_.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(id),
+        std::forward_as_tuple(jsonVal));
+    });
+  loadFiles(archive, stats[locationsFilePrefix], "locations",
+    [&] (const rapidjson::Value& jsonVal) -> void {
+      if (!jsonVal.HasMember("id")) {
+        return ;
+      }
+      const int32_t id = jsonVal["id"].GetInt();
+      locations_.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(id),
+        std::forward_as_tuple(jsonVal));
+    });
+  loadFiles(archive, stats[visitsFilePrefix], "visits",
+    [&] (const rapidjson::Value& jsonVal) -> void {
+      if (!jsonVal.HasMember("id")) {
+        return ;
+      }
+      const int32_t id = jsonVal["id"].GetInt();
+      if (!jsonVal.HasMember("location")) {
+        return ;
+      }
+      const int32_t locationId = jsonVal["location"].GetInt();
+      if (!jsonVal.HasMember("user")) {
+        return ;
+      }
+      const int32_t userId = jsonVal["user"].GetInt();
 
-  for (auto& visit : visits_) {
-    auto userIt = users_.find(visit.second.user);
-    if (users_.end() == userIt) {
-      continue;
-    }
-    userIt->second.visits_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(visit.first),
-      std::forward_as_tuple(&(visit.second)));
+      auto userIt = users_.find(userId);
+      if (users_.end() == userIt) {
+        return ;
+      }
+      User* user = &userIt->second;
 
-    auto locationIt = locations_.find(visit.second.location);
-    if (locations_.end() == locationIt) {
-      return Result::SUCCESS;
-    }
-    locationIt->second.visits_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(visit.first),
-      std::forward_as_tuple(&userIt->second, &visit.second));
-  }
+      auto locationIt = locations_.find(locationId);
+      if (locations_.end() == locationIt) {
+        return ;
+      }
+      Location* location = &locationIt->second;
+
+      auto res = visits_.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(id),
+        std::forward_as_tuple(locationId, userId, location, user, jsonVal));
+      Visit* visit = &res.first->second;
+
+      user->visits_.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(id),
+        std::forward_as_tuple(visit));
+
+      location->visits_.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(id),
+        std::forward_as_tuple(user, visit));
+    });
 
   return Result::SUCCESS;
+}
+
+void Storage::loadFiles(
+  zip *archive,
+  ZipStats& zipStats,
+  const std::string& arrayName,
+  const MapLoaderFunc& func)
+{
+  LOG(stderr, "Loading to '%s' from %zu file(s)\n", arrayName.c_str(), zipStats.size());
+  for (auto& stat : zipStats) {
+    LOG(stderr, "Loading from file %s\n", stat.name);
+
+    struct zip_file* zf = zip_fopen(archive, stat.name, 0);
+    if (!zf) {
+      continue;
+    }
+
+    {
+      size_t size = stat.size;
+      size_t offset = 0;
+      char* buf = new char[size + 1];
+      while (offset != size) {
+        int len = zip_fread(zf, buf + offset, size - offset);
+        if (len < 0) {
+          break;
+        }
+        offset += len;
+      }
+      buf[size] = '\0';
+      zip_fclose(zf);
+
+      {
+        // parse json
+        using namespace rapidjson;
+        Document document;
+        document.Parse(buf);
+        if (!document.HasMember(arrayName.c_str())) {
+          continue;
+        }
+        const Value& jsonArr = document[arrayName.c_str()];
+        uint64_t loaded = 0;
+        for (auto it = jsonArr.Begin(), end = jsonArr.End(); it != end; ++it) {
+          try {
+            func(*it);
+            ++ loaded;
+          } catch (...) {
+            LOG(stderr, "Error occurred while parsing entry from '%s'\n", arrayName.c_str());
+            continue;
+          }
+        }
+        LOG(stderr, "Loaded %lu entries from %s file\n", loaded, stat.name);
+      }
+
+      delete[] buf;
+    }
+  }
 }
 
 Result Storage::addUser(const rapidjson::Value& jsonVal)
@@ -109,36 +207,45 @@ Result Storage::addVisit(const rapidjson::Value& jsonVal)
   if (!jsonVal.HasMember("id")) {
     return Result::FAILED;
   }
-  int32_t id = jsonVal["id"].GetInt();
-  tbb::spin_rw_mutex::scoped_lock visitsLock(visitsGuard_, true);
-  auto res = visits_.emplace(
-    std::piecewise_construct,
-    std::forward_as_tuple(id),
-    std::forward_as_tuple(jsonVal));
-
-  Visit* visit = &res.first->second;
-  auto userId = visit->user;
-  auto locationId = visit->location;
-  visitsLock.release();
+  const int32_t id = jsonVal["id"].GetInt();
+  if (!jsonVal.HasMember("location")) {
+    return Result::FAILED;
+  }
+  const int32_t locationId = jsonVal["location"].GetInt();
+  if (!jsonVal.HasMember("user")) {
+    return Result::FAILED;
+  }
+  const int32_t userId = jsonVal["user"].GetInt();
 
   tbb::spin_rw_mutex::scoped_lock usersLock(usersGuard_, false);
   auto userIt = users_.find(userId);
   if (users_.end() == userIt) {
-    return Result::SUCCESS;
+    return Result::NOT_FOUND;
   }
-  userIt->second.visits_.emplace(
-    std::piecewise_construct,
-    std::forward_as_tuple(id),
-    std::forward_as_tuple(visit));
   User* user = &userIt->second;
-  usersLock.release();
 
   tbb::spin_rw_mutex::scoped_lock locationsLock(locationsGuard_, false);
   auto locationIt = locations_.find(locationId);
   if (locations_.end() == locationIt) {
-    return Result::SUCCESS;
+    return Result::NOT_FOUND;
   }
-  locationIt->second.visits_.emplace(
+  Location* location = &locationIt->second;
+
+  usersLock.upgrade_to_writer();
+  locationsLock.upgrade_to_writer();
+  tbb::spin_rw_mutex::scoped_lock visitsLock(visitsGuard_, true);
+  auto res = visits_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(id),
+    std::forward_as_tuple(locationId, userId, location, user, jsonVal));
+  Visit* visit = &res.first->second;
+
+  user->visits_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(id),
+    std::forward_as_tuple(visit));
+
+  location->visits_.emplace(
     std::piecewise_construct,
     std::forward_as_tuple(id),
     std::forward_as_tuple(user, visit));
