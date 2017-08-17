@@ -52,7 +52,7 @@ struct Request
   int32_t paramsSize_;
 
   bool hasContentType_ = false;
-  int32_t contentLength_ = -1;
+  int32_t contentLength_ = 0;
 
   rapidjson::Document json_;
 
