@@ -178,7 +178,7 @@ HTTPCode StateMachine::getVisit(std::string& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::getUserVisits(std::string& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getUserVisits(resp, req.id_, req.params_);
+  Result res = storage.getUserVisits(resp, req.id_, req.params_, req.paramsSize_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -189,7 +189,7 @@ HTTPCode StateMachine::getUserVisits(std::string& resp, db::Storage& storage, Re
 
 HTTPCode StateMachine::getLocationAvgScore(std::string& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getLocationAvgScore(resp, req.id_, req.params_);
+  Result res = storage.getLocationAvgScore(resp, req.id_, req.params_, req.paramsSize_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {

@@ -88,7 +88,7 @@ static std::string to_string(const double val)
   return ss.str();
 }
 
-std::string Location::getJsonAvgScore(std::string& params)
+std::string Location::getJsonAvgScore(const char* params, const int32_t paramsSize)
 {
   std::string str;
   str.reserve(32);

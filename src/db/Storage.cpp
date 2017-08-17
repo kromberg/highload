@@ -460,25 +460,25 @@ Result Storage::getVisit(std::string& resp, const int32_t id)
   return Result::SUCCESS;
 }
 
-Result Storage::getUserVisits(std::string& resp, const int32_t id, std::string& params)
+Result Storage::getUserVisits(std::string& resp, const int32_t id, const char* params, const int32_t paramsSize)
 {
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
   if (users_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = std::move(it->second.getJsonVisits(params));
+  resp = std::move(it->second.getJsonVisits(params, paramsSize));
   return Result::SUCCESS;
 }
 
-Result Storage::getLocationAvgScore(std::string& resp, const int32_t id, std::string& params)
+Result Storage::getLocationAvgScore(std::string& resp, const int32_t id, const char* params, const int32_t paramsSize)
 {
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);
   if (locations_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = std::move(it->second.getJsonAvgScore(params));
+  resp = std::move(it->second.getJsonAvgScore(params, paramsSize));
   return Result::SUCCESS;
 }
 

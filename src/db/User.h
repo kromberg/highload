@@ -30,7 +30,7 @@ struct User
   User(const rapidjson::Value& jsonVal);
   bool update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
-  std::string getJsonVisits(std::string& params);
+  std::string getJsonVisits(const char* params, const int32_t paramsSize);
 };
 } // namespace db
 #endif // _DB_USER_H_

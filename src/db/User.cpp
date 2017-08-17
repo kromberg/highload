@@ -101,7 +101,7 @@ std::string User::getJson(int32_t id)
   return str;
 }
 
-std::string User::getJsonVisits(std::string& params)
+std::string User::getJsonVisits(const char* params, const int32_t paramsSize)
 {
   std::string str;
 

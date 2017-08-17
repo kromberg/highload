@@ -47,12 +47,12 @@ public:
   Result addUser(const rapidjson::Value& jsonVal);
   Result updateUser(const int32_t id, const rapidjson::Value& jsonVal);
   Result getUser(std::string& resp, const int32_t id);
-  Result getUserVisits(std::string& resp, const int32_t id, std::string& params);
+  Result getUserVisits(std::string& resp, const int32_t id, const char* params, const int32_t paramsSize);
 
   Result addLocation(const rapidjson::Value& jsonVal);
   Result updateLocation(const int32_t id, const rapidjson::Value& jsonVal);
   Result getLocation(std::string& resp, const int32_t id);
-  Result getLocationAvgScore(std::string& resp, const int32_t id, std::string& params);
+  Result getLocationAvgScore(std::string& resp, const int32_t id, const char* params, const int32_t paramsSize);
 
   Result addVisit(const rapidjson::Value& jsonVal);
   Result updateVisit(const int32_t id, const rapidjson::Value& jsonVal);

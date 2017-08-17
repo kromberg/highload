@@ -57,8 +57,8 @@ struct Request
   rapidjson::Document json_;
 
   void dump() {
-    LOG(stderr, "Type = %d; Table1 = %d; Table2 = %d; ID = %d; Params = %s; Json: \n",
-      type_, table1_, table2_, id_, params_.c_str());
+    LOG(stderr, "Type = %d; Table1 = %d; Table2 = %d; ID = %d; Params = %s\n",
+      type_, table1_, table2_, id_, params_);
   }
 };
 } // namespace http
