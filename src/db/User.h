@@ -21,8 +21,14 @@ struct User
 
   std::unordered_map<int32_t, Visit*> visits_;
 
+  User(
+    std::string&& _email,
+    std::string&& _first_name,
+    std::string&& _last_name,
+    const int32_t _birth_date,
+    const uint16_t _gender);
   User(const rapidjson::Value& jsonVal);
-  void update(const rapidjson::Value& jsonVal);
+  bool update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
   std::string getJsonVisits(std::string& params);
 };

@@ -174,30 +174,161 @@ void Storage::loadFiles(
 
 Result Storage::addUser(const rapidjson::Value& jsonVal)
 {
+  using namespace rapidjson;
   if (!jsonVal.HasMember("id")) {
     return Result::FAILED;
   }
-  int32_t id = jsonVal["id"].GetInt();
+  int32_t id;
+  {
+    const Value& val = jsonVal["id"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    id = val.GetInt();
+  }
+
+  if (!jsonVal.HasMember("email")) {
+    return Result::FAILED;
+  }
+  std::string email;
+  {
+    const Value& val = jsonVal["email"];
+    if (!val.IsString()) {
+      return Result::FAILED;
+    }
+    email = std::string(val.GetString());
+  }
+
+  if (!jsonVal.HasMember("first_name")) {
+    return Result::FAILED;
+  }
+  std::string first_name;
+  {
+    const Value& val = jsonVal["first_name"];
+    if (!val.IsString()) {
+      return Result::FAILED;
+    }
+    first_name = std::string(val.GetString());
+  }
+
+  if (!jsonVal.HasMember("last_name")) {
+    return Result::FAILED;
+  }
+  std::string last_name;
+  {
+    const Value& val = jsonVal["last_name"];
+    if (!val.IsString()) {
+      return Result::FAILED;
+    }
+    last_name = std::string(val.GetString());
+  }
+
+  if (!jsonVal.HasMember("birth_date")) {
+    return Result::FAILED;
+  }
+  int32_t birth_date;
+  {
+    const Value& val = jsonVal["birth_date"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    birth_date = val.GetInt();
+  }
+
+  if (!jsonVal.HasMember("gender")) {
+    return Result::FAILED;
+  }
+  uint16_t gender;
+  {
+    const Value& val = jsonVal["gender"];
+    if (!val.IsString()) {
+      return Result::FAILED;
+    }
+    const char* genderStr = val.GetString();
+    if (*genderStr == 'f') {
+      gender = false;
+    } else if (*genderStr == 'm') {
+      gender = true;
+    }
+  }
+
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, true);
   users_.emplace(
     std::piecewise_construct,
     std::forward_as_tuple(id),
-    std::forward_as_tuple(jsonVal));
+    std::forward_as_tuple(std::move(email), std::move(first_name), std::move(last_name), birth_date, gender));
 
   return Result::SUCCESS;
 }
 
 Result Storage::addLocation(const rapidjson::Value& jsonVal)
 {
+  using namespace rapidjson;
   if (!jsonVal.HasMember("id")) {
     return Result::FAILED;
   }
-  int32_t id = jsonVal["id"].GetInt();
+  int32_t id;
+  {
+    const Value& val = jsonVal["id"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    id = val.GetInt();
+  }
+
+  if (!jsonVal.HasMember("place")) {
+    return Result::FAILED;
+  }
+  std::string place;
+  {
+    const Value& val = jsonVal["place"];
+    if (!val.IsString()) {
+      return Result::FAILED;
+    }
+    place = std::string(val.GetString());
+  }
+
+  if (!jsonVal.HasMember("country")) {
+    return Result::FAILED;
+  }
+  std::string country;
+  {
+    const Value& val = jsonVal["country"];
+    if (!val.IsString()) {
+      return Result::FAILED;
+    }
+    country = std::string(val.GetString());
+  }
+
+  if (!jsonVal.HasMember("city")) {
+    return Result::FAILED;
+  }
+  std::string city;
+  {
+    const Value& val = jsonVal["city"];
+    if (!val.IsString()) {
+      return Result::FAILED;
+    }
+    city = std::string(val.GetString());
+  }
+
+  if (!jsonVal.HasMember("distance")) {
+    return Result::FAILED;
+  }
+  int32_t distance;
+  {
+    const Value& val = jsonVal["distance"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    distance = val.GetInt();
+  }
+
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, true);
   locations_.emplace(
     std::piecewise_construct,
     std::forward_as_tuple(id),
-    std::forward_as_tuple(jsonVal));
+    std::forward_as_tuple(std::move(place), std::move(country), std::move(city), distance));
 
   return Result::SUCCESS;
 }
@@ -261,7 +392,9 @@ Result Storage::updateUser(const int32_t id, const rapidjson::Value& jsonVal)
     return Result::NOT_FOUND;
   }
   l.upgrade_to_writer();
-  it->second.update(jsonVal);
+  if (!it->second.update(jsonVal)) {
+    return Result::FAILED;
+  }
 
   return Result::SUCCESS;
 }
@@ -274,7 +407,9 @@ Result Storage::updateLocation(const int32_t id, const rapidjson::Value& jsonVal
     return Result::NOT_FOUND;
   }
   l.upgrade_to_writer();
-  it->second.update(jsonVal);
+  if (!it->second.update(jsonVal)) {
+    return Result::FAILED;
+  }
 
   return Result::SUCCESS;
 }
@@ -333,6 +468,17 @@ Result Storage::getUserVisits(std::string& resp, const int32_t id, std::string& 
     return Result::NOT_FOUND;
   }
   resp = std::move(it->second.getJsonVisits(params));
+  return Result::SUCCESS;
+}
+
+Result Storage::getLocationAvgScore(std::string& resp, const int32_t id, std::string& params)
+{
+  tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
+  auto it = locations_.find(id);
+  if (locations_.end() == it) {
+    return Result::NOT_FOUND;
+  }
+  resp = std::move(it->second.getJsonAvgScore(params));
   return Result::SUCCESS;
 }
 

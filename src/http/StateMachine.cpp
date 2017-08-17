@@ -45,7 +45,7 @@ StateMachine::Handler StateMachine::handlersMatrix_[size_t(Type::MAX)][size_t(Ta
     // USERS
     { StateMachine::getUser, emptyH(), emptyH(), StateMachine::getUserVisits, emptyH(), },
     // LOCATIONS
-    { StateMachine::getLocation, emptyH(), emptyH(), emptyH(), StateMachine::getLocationScore, },
+    { StateMachine::getLocation, emptyH(), emptyH(), emptyH(), StateMachine::getLocationAvgScore, },
     // VISITS
     { StateMachine::getVisit, emptyH(), emptyH(), emptyH(), emptyH(), },
     // AVG
@@ -187,9 +187,15 @@ HTTPCode StateMachine::getUserVisits(std::string& resp, db::Storage& storage, Re
   return HTTPCode::OK;
 }
 
-HTTPCode StateMachine::getLocationScore(std::string& resp, db::Storage& storage, Request& req)
+HTTPCode StateMachine::getLocationAvgScore(std::string& resp, db::Storage& storage, Request& req)
 {
-  return HTTPCode::NOT_FOUND;
+  Result res = storage.getLocationAvgScore(resp, req.id_, req.params_);
+  if (Result::NOT_FOUND == res) {
+    return HTTPCode::NOT_FOUND;
+  } else if (Result::SUCCESS != res) {
+    return HTTPCode::BAD_REQ;
+  }
+  return HTTPCode::OK;
 }
 
 StateMachine::Handler StateMachine::getHandler(const Request& req)

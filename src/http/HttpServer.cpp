@@ -40,12 +40,12 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
     TABLE1,
     ID,
     TABLE2,
+    ERROR,
   } state = State::TABLE1;
 
   size_t end = url.find('?', 1);
   if (std::string::npos != end) {
     req.params_ = url.substr(end + 1);
-    LOG(stderr, "Requst params: %s\n", req.params_.c_str());
   }
 
   size_t pos1, pos2 = 0;
@@ -71,6 +71,7 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
           state = State::ID;
         } else {
           req.table2_ = it->second;
+          state = State::ERROR;
         }
         break;
       }
@@ -88,6 +89,8 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
         }
         break;
       }
+      case State::ERROR:
+        return HTTPCode::BAD_REQ;
     }
 
   } while (pos2 != end);
@@ -141,10 +144,13 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
   {
     header.clear();
     getline(reqStream, header);
-    if (header.empty()) {
+    if (header.empty() || (header.size() == 1 && header[0] == '\n')) {
       break;
     }
     size_t pos = header.find(':');
+    if (std::string::npos == pos) {
+      return HTTPCode::BAD_REQ;
+    }
     std::string name = header.substr(0, pos);
     if ("Content-Length" == name) {
       try {
@@ -156,6 +162,7 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
       hasContentType = true;
     }
   }
+  LOG(stderr, "Has content-type: %s. content-length: %d\n", (hasContentType ? "true" : "false"), contentLength);
 
   // post must have content
   if (req.type_ == Type::POST && !hasContentType) {
@@ -175,7 +182,10 @@ HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
   std::string content;
   content.resize(contentLength);
   reqStream.get(&content[0], contentLength);
-  req.json_.Parse(content.c_str());
+  if (req.json_.Parse(content.c_str()).HasParseError()) {
+    LOG(stderr, "Parsing error for %s\n", content.c_str());
+    return HTTPCode::BAD_REQ;
+  }
 
   return HTTPCode::OK;
 }
@@ -188,24 +198,21 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
   do {
     int res = sock.recv(buffer, sizeof(buffer));
     if (res) {
-      buffer[res] = 0;
-      reqStream << buffer;
+      reqStream.write(buffer, res);
     }
   } while (res > 0);
-  LOG(stderr, "Received request: %s\n", reqStream.str().c_str());
 
   std::string body("{}");
   Request req;
   HTTPCode code = parseRequest(req, reqStream);
   if (HTTPCode::OK != code) {
+    LOG(stderr, "ERROR %d WHILE PARSING REQ %s\n", code, reqStream.str().c_str());
     sendResponse(sock, code, body);
     return ;
   }
-  req.dump();
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
-    LOG(stderr, "There is no handler for requst\n");
     sendResponse(sock, code, body);
     return ;
   }
@@ -228,7 +235,7 @@ void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code, const std:
   response[size] = '\0';
   ++ size;
 
-  LOG(stderr, "Sending response: %s\n", response);
+  //LOG(stderr, "Sending response: %s\n", response);
 
   send(sock, response, size);
   delete[] response;

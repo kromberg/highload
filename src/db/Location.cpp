@@ -7,6 +7,17 @@
 
 namespace db
 {
+Location::Location(
+  std::string&& _place,
+  std::string&& _country,
+  std::string&& _city,
+  const int32_t _distance):
+  place(std::move(_place)),
+  country(std::move(_country)),
+  city(std::move(_city)),
+  distance(_distance)
+{}
+
 Location::Location(const rapidjson::Value& jsonVal)
 {
   place = std::string(jsonVal["place"].GetString());
@@ -15,21 +26,46 @@ Location::Location(const rapidjson::Value& jsonVal)
   distance = jsonVal["distance"].GetInt();
 }
 
-void Location::update(const rapidjson::Value& jsonVal)
+bool Location::update(const rapidjson::Value& jsonVal)
 {
+  using namespace rapidjson;
+  Location tmp(*this);
   if (jsonVal.HasMember("place")) {
-    place = std::string(jsonVal["place"].GetString());
+    const Value& val = jsonVal["place"];
+    if (!val.IsString()) {
+      return false;
+    }
+    tmp.place = std::string(val.GetString());
   }
+
   if (jsonVal.HasMember("country")) {
-    country = std::string(jsonVal["country"].GetString());
+    const Value& val = jsonVal["country"];
+    if (!val.IsString()) {
+      return false;
+    }
+    tmp.country = std::string(val.GetString());
   }
+
   if (jsonVal.HasMember("city")) {
-    city = std::string(jsonVal["city"].GetString());
+    const Value& val = jsonVal["city"];
+    if (!val.IsString()) {
+      return false;
+    }
+    tmp.city = std::string(val.GetString());
   }
+
   if (jsonVal.HasMember("distance")) {
-    distance = jsonVal["distance"].GetInt();
+    const Value& val = jsonVal["distance"];
+    if (!val.IsInt()) {
+      return false;
+    }
+    tmp.distance = val.GetInt();
   }
+
+  *this = std::move(tmp);
+  return true;
 }
+
 std::string Location::getJson(int32_t id)
 {
   std::string str;
@@ -52,7 +88,7 @@ static std::string to_string(const double val)
   return ss.str();
 }
 
-std::string Location::getJsonAvgMark(std::string& params)
+std::string Location::getJsonAvgScore(std::string& params)
 {
   std::string str;
   str.reserve(32);

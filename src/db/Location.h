@@ -21,10 +21,15 @@ struct Location
 
   std::unordered_map<int32_t, std::pair<User*, Visit*> > visits_;
 
+  Location(
+    std::string&& _place,
+    std::string&& _country,
+    std::string&& _city,
+    const int32_t _distance);
   Location(const rapidjson::Value& jsonVal);
-  void update(const rapidjson::Value& jsonVal);
+  bool update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
-  std::string getJsonAvgMark(std::string& params);
+  std::string getJsonAvgScore(std::string& params);
 };
 } // namespace db
 #endif // _DB_LOCATION_H_

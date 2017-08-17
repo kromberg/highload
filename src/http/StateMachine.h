@@ -37,7 +37,7 @@ private:
   static HTTPCode getVisit(std::string& resp, db::Storage& storage, Request& req);
 
   static HTTPCode getUserVisits(std::string& resp, db::Storage& storage, Request& req);
-  static HTTPCode getLocationScore(std::string& resp, db::Storage& storage, Request& req);
+  static HTTPCode getLocationAvgScore(std::string& resp, db::Storage& storage, Request& req);
 public:
   
 

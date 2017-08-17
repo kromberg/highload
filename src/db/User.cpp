@@ -5,6 +5,19 @@
 
 namespace db
 {
+User::User(
+  std::string&& _email,
+  std::string&& _first_name,
+  std::string&& _last_name,
+  const int32_t _birth_date,
+  const uint16_t _gender):
+  email(std::move(_email)),
+  first_name(std::move(_first_name)),
+  last_name(std::move(_last_name)),
+  birth_date(_birth_date),
+  gender(_gender)
+{}
+
 User::User(const rapidjson::Value& jsonVal)
 {
   email = std::string(jsonVal["email"].GetString());
@@ -19,28 +32,58 @@ User::User(const rapidjson::Value& jsonVal)
   }
 }
 
-void User::update(const rapidjson::Value& jsonVal)
+bool User::update(const rapidjson::Value& jsonVal)
 {
+  using namespace rapidjson;
+  User tmp(*this);
   if (jsonVal.HasMember("email")) {
-    email = std::string(jsonVal["email"].GetString());
+    const Value& val = jsonVal["email"];
+    if (!val.IsString()) {
+      return false;
+    }
+    tmp.email = std::string(val.GetString());
   }
+
   if (jsonVal.HasMember("first_name")) {
-    first_name = std::string(jsonVal["first_name"].GetString());
+    const Value& val = jsonVal["first_name"];
+    if (!val.IsString()) {
+      return false;
+    }
+    tmp.first_name = std::string(val.GetString());
   }
+
   if (jsonVal.HasMember("last_name")) {
-    last_name = std::string(jsonVal["last_name"].GetString());
+    const Value& val = jsonVal["last_name"];
+    if (!val.IsString()) {
+      return false;
+    }
+    tmp.last_name = std::string(val.GetString());
   }
+
   if (jsonVal.HasMember("birth_date")) {
-    birth_date = jsonVal["birth_date"].GetInt64();
+    const Value& val = jsonVal["birth_date"];
+    if (!val.IsInt()) {
+      return false;
+    }
+    tmp.birth_date = val.GetInt();
   }
+
   if (jsonVal.HasMember("gender")) {
-    const char* genderStr = jsonVal["gender"].GetString();
+    const Value& val = jsonVal["gender"];
+    if (!val.IsString()) {
+      return false;
+    }
+    const char* genderStr = val.GetString();
     if (*genderStr == 'f') {
-      gender = false;
+      tmp.gender = false;
     } else if (*genderStr == 'm') {
-      gender = true;
+      tmp.gender = true;
     }
   }
+
+  *this = std::move(tmp);
+
+  return true;
 }
 std::string User::getJson(int32_t id)
 {
