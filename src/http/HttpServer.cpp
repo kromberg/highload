@@ -1,5 +1,6 @@
 #include <thread>
 #include <sstream>
+#include <cstring>
 #include <unordered_map>
 
 #include "StateMachine.h"
@@ -25,7 +26,7 @@ HttpServer::HttpServer(db::StoragePtr& storage):
 HttpServer::~HttpServer()
 {}
 
-HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
+HTTPCode HttpServer::parseURL(Request& req, const char* url, int32_t urlSize)
 {
   static std::unordered_map<std::string, Table> strToTableMap = 
   {
@@ -35,6 +36,10 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
     { "avg",       Table::AVG },
   };
 
+  if (urlSize <= 0) {
+    return HTTPCode::BAD_REQ;
+  }
+
   enum class State
   {
     TABLE1,
@@ -43,26 +48,30 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
     ERROR,
   } state = State::TABLE1;
 
-  size_t end = url.find('?', 1);
-  if (std::string::npos != end) {
-    req.params_ = url.substr(end + 1);
+  const char* next = strchr(url + 1, '?');
+  if (next) {
+    req.params_ = next + 1;
+    req.paramsSize_ = size - (next - url);
   }
 
-  size_t pos1, pos2 = 0;
+  const char* prev = nullptr;
+  next = url;
   do
   {
-    pos1 = pos2 + 1;
-    pos2 = url.find('/', pos1);
-    if (std::string::npos == pos2) {
-      pos2 = end;
+    prev = next + 1;
+    next = strchr(prev, '/');
+    int size;
+    if (!next) {
+      size = urlSize - (prev - url);
+    } else {
+      size = next - prev;
     }
-    size_t size = (std::string::npos == pos2) ? std::string::npos : (pos2 - pos1);
 
     switch (state) {
       case State::TABLE1:
       case State::TABLE2:
       {
-        auto it = strToTableMap.find(url.substr(pos1, size));
+        auto it = strToTableMap.find(std::string(prev, size));
         if (strToTableMap.end() == it) {
           return HTTPCode::BAD_REQ;
         }
@@ -77,12 +86,11 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
       }
       case State::ID:
       {
-        std::string id = url.substr(pos1, size);
-        if ("new" == id) {
+        if (0 == strncmp(prev, size, "new")) {
           req.id_ = -1;
         } else {
           try {
-            req.id_ = std::stoul(id);
+            req.id_ = std::stoul(std::string(prev, size));
           } catch (std::invalid_argument &e) {
             return HTTPCode::NOT_FOUND;
           }
@@ -93,29 +101,35 @@ HTTPCode HttpServer::parseURL(Request& req, const std::string& url)
         return HTTPCode::BAD_REQ;
     }
 
-  } while (pos2 != end);
+  } while (next);
 
   return HTTPCode::OK;
 }
 
-HTTPCode HttpServer::parseRequestMethod(Request& req, const std::string& reqMethod)
+HTTPCode HttpServer::parseRequestMethod(Request& req, const char* reqMethod, int32_t size)
 {
-  static std::string POST_STR = "POST";
-  static std::string GET_STR = "GET";
-  size_t pos1 = 0, pos2 = reqMethod.find(' ');
+  if (size <= 0) {
+    return HTTPCode::BAD_REQ;
+  }
+  const char* next = strchr(reqMethod, ' ');
+  if (!next) {
+    return HTTPCode::BAD_REQ;
+  }
   std::string typeStr = reqMethod.substr(pos1, pos2);
-  if (0 == typeStr.compare(POST_STR)) {
+  if (0 == strncmp(reqMethod, next - reqMethod, "POST")) {
     req.type_ = Type::POST;
-  } else if (0 == typeStr.compare(GET_STR)) {
+  } else if (0 == strncmp(reqMethod, next - reqMethod, "GET")) {
     req.type_ = Type::GET;
   } else {
-    req.type_ = Type::NONE;
+    return HTTPCode::BAD_REQ;
   }
-  pos1 = pos2 + 1;
-  pos2 = reqMethod.find(' ', pos1);
-  std::string url = reqMethod.substr(pos1, pos2 - pos1);
+  reqMethod = next + 1;
+  next = strchr(reqMethod, ' ');
+  if (!next) {
+    return HTTPCode::BAD_REQ;
+  }
 
-  HTTPCode code = parseURL(req, url);
+  HTTPCode code = parseURL(req, reqMethod, next - reqMethod);
   if (HTTPCode::OK != code) {
     return code;
   }
@@ -123,90 +137,31 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, const std::string& reqMeth
   return HTTPCode::OK;
 }
 
-HTTPCode HttpServer::parseRequest(Request& req, std::stringstream& reqStream)
+HTTPCode HttpServer::parseHeader(Request& req, const char* header, int32_t size)
 {
-  reqStream.seekp(0);
-
-  std::string reqMethod;
-  getline(reqStream, reqMethod);
-  if (reqMethod.empty()) {
+  const char* val = strchr(header, ':');
+  if (!val || (val - header) > size) {
     return HTTPCode::BAD_REQ;
   }
-  HTTPCode code = parseRequestMethod(req, reqMethod);
-  if (HTTPCode::OK != code) {
-    return code;
-  }
-
-  std::string header;
-  int contentLength = 0;
-  bool hasContentType = false;
-  for (;;)
-  {
-    header.clear();
-    getline(reqStream, header);
-    if (header.empty() || (header.size() == 1 && header[0] == '\n')) {
-      break;
-    }
-    size_t pos = header.find(':');
-    if (std::string::npos == pos) {
+  std::string name = header.substr(0, pos);
+  if (0 == strncmp(header, val - header, "Content-Length")) {
+    try {
+      req.contentLength_ = std::stoi(std::string(header, val - header));
+    } catch (std::invalid_argument& e) {
       return HTTPCode::BAD_REQ;
     }
-    std::string name = header.substr(0, pos);
-    if ("Content-Length" == name) {
-      try {
-        contentLength = std::stoi(header.substr(pos + 1));
-      } catch (std::invalid_argument& e) {
-        return HTTPCode::BAD_REQ;
-      }
-    } else if ("Content-Type" == name) {
-      hasContentType = true;
-    }
+  } else if (0 == strncmp(header, val - header, "Content-Type")) {
+    req.hasContentType_ = true;
   }
-  LOG(stderr, "Has content-type: %s. content-length: %d\n", (hasContentType ? "true" : "false"), contentLength);
-
-  // post must have content
-  if (req.type_ == Type::POST && !hasContentType) {
-    return HTTPCode::BAD_REQ;
-  }
-
-  if (contentLength < 0) {
-    return HTTPCode::BAD_REQ;
-  } else if (0 == contentLength) {
-    if (req.type_ == Type::GET) {
-      return HTTPCode::OK;
-    } else {
-      return HTTPCode::BAD_REQ;
-    }
-  }
-
-  std::string content;
-  content.resize(contentLength);
-  reqStream.get(&content[0], contentLength);
-  if (req.json_.Parse(content.c_str()).HasParseError()) {
-    LOG(stderr, "Parsing error for %s\n", content.c_str());
-    return HTTPCode::BAD_REQ;
-  }
-
   return HTTPCode::OK;
 }
 
 void HttpServer::handleRequest(tcp::Socket&& sock)
 {
-  std::stringstream reqStream;
-  thread_local char buffer[128];
-  int res = 0;
-  do {
-    int res = sock.recv(buffer, sizeof(buffer));
-    if (res) {
-      reqStream.write(buffer, res);
-    }
-  } while (res > 0);
-
   std::string body("{}");
   Request req;
-  HTTPCode code = parseRequest(req, reqStream);
+  HTTPCode code = readRequest(req, sock);
   if (HTTPCode::OK != code) {
-    LOG(stderr, "ERROR %d WHILE PARSING REQ %s\n", code, reqStream.str().c_str());
     sendResponse(sock, code, body);
     return ;
   }
@@ -224,6 +179,66 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
   }
 
   sendResponse(sock, code, body);
+}
+
+HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
+{
+  enum class State
+  {
+    METHOD,
+    HEADERS,
+    BODY,
+  } state = State::METHOD;
+  HTTPCode code;
+  char buffer[1024];
+  int offset = 0, size = 0, contentLength = 0;
+  do {
+    int res = sock.recv(buffer + size, sizeof(buffer) - size);
+    if (res) {
+      size += res;
+      if (State::BODY == state) {
+        if (size - offset < contentLength) {
+          continue;
+        }
+        buffer[size] = '\0';
+        if (req.json_.Parse(buffer + offset).HasParseError()) {
+          return HTTPCode::BAD_REQ;
+        }
+        break;
+      }
+      const char* next = strchr(buffer + offset, '\n');
+      while (next) {
+        switch (state) {
+          case State::METHOD:
+          {
+            code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
+            if (HTTPCode::OK != code) {
+              return code;
+            }
+            state = State::HEADERS;
+            break;
+          }
+          case State::HEADERS:
+          {
+            if (next == buffer + 1) {
+              state = State::BODY;
+              break;
+            }
+            code = parseHeader(req, buffer + offset, next - buffer - offset);
+            if (HTTPCode::OK != code) {
+              return code;
+            }
+            break;
+          }
+          default:
+            break;
+        }
+        offset = next - buffer + 1;
+        next = strchr(buffer + offset, '\n');
+      }
+    }
+  } while (res >= 0);
+  return code;
 }
 
 void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code, const std::string& body)

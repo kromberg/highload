@@ -48,7 +48,11 @@ struct Request
   Table table1_ = Table::NONE;
   Table table2_ = Table::NONE;
   int32_t id_ = -1;
-  std::string params_;
+  const char* params_;
+  int32_t paramsSize_;
+
+  bool hasContentType_ = false;
+  int32_t contentLength_ = -1;
 
   rapidjson::Document json_;
 

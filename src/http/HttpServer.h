@@ -16,12 +16,13 @@ private:
   void handleRequest(tcp::Socket&& sock);
   virtual void acceptSocket(tcp::Socket&& sock) override;
 
-  HTTPCode parseURL(Request& req, const std::string& url);
-  HTTPCode parseRequestMethod(Request& req, const std::string& reqMethod);
-  HTTPCode parseRequest(Request& req, std::stringstream& reqStream);
+  HTTPCode parseURL(Request& req, const char* url, int32_t size);
+  HTTPCode parseRequestMethod(Request& req, const char* reqMethod, int32_t size);
+  HTTPCode parseHeader(Request& req, const char* header, int32_t size);
+  HTTPCode readRequest(Request& req, tcp::Socket& sock);
 
   void sendResponse(tcp::Socket& sock, const HTTPCode code, const std::string& body);
-  void send(tcp::Socket& sock, const char* buffer, int size);
+  void send(tcp::Socket& sock, const char* buffer, int32_t size);
 
 public:
   HttpServer(db::StoragePtr& storage);
