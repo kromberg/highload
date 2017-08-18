@@ -238,17 +238,15 @@ Result Storage::addUser(const rapidjson::Value& jsonVal)
   if (!jsonVal.HasMember("gender")) {
     return Result::FAILED;
   }
-  uint16_t gender;
+  char gender;
   {
     const Value& val = jsonVal["gender"];
     if (!val.IsString()) {
       return Result::FAILED;
     }
-    const char* genderStr = val.GetString();
-    if (*genderStr == 'f') {
-      gender = false;
-    } else if (*genderStr == 'm') {
-      gender = true;
+    gender = *val.GetString();
+    if (gender != 'f' && gender != 'm') {
+      return Result::FAILED;
     }
   }
 

@@ -1,8 +1,11 @@
 #include <sstream>
 #include <iomanip>
+#include <ctime>
+#include <time.h>
 
 #include <rapidjson/stringbuffer.h>
 
+#include "Utils.h"
 #include "Location.h"
 
 namespace db
@@ -88,20 +91,77 @@ static std::string to_string(const double val)
   return ss.str();
 }
 
-Result Location::getJsonAvgScore(std::string& result, const char* params, const int32_t paramsSize)
+Result Location::getJsonAvgScore(std::string& result, char* params, const int32_t paramsSize)
 {
-  result.reserve(32);
-  double avg = 0;
-  size_t count = 0;
-  for (auto& visitEntry : visits_) {
-    Visit* visit = visitEntry.second.second;
-    avg += visit->mark;
-    ++ count;
-  }
-  if (count) {
-    avg /= count;
+  static time_t currentTimeT = time(nullptr);
+  static struct tm currentTime = *gmtime(&currentTimeT);
+  struct Parameters
+  {
+    std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
+    std::pair<int32_t, int32_t> age{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
+    char gender = 0;
+    bool valid(const std::pair<User*, Visit*>& visit) const
+    {
+      return (visit.second->visited_at > date.first && visit.second->visited_at < date.second &&
+              visit.first->birth_date > age.first && visit.first->birth_date < age.second &&
+              (!gender || visit.first->gender == gender));
+    }
+  } requestParameter;
+  // parse parameters
+  char* next = nullptr, *param = params;
+  do {
+    char* next = strchr(param, '&');
+    if (next) {
+      *next = '\0';
+    }
+    // parse parameter
+    char* val = strchr(param, '=');
+    if (!val) {
+      return Result::FAILED;
+    }
+    if (0 == strncmp(param, "fromDate", val - param)) {
+      PARSE_INT32(requestParameter.date.first, val + 1);
+    } else if (0 == strncmp(param, "toDate", val - param)) {
+      PARSE_INT32(requestParameter.date.second, val + 1);
+    } else if (0 == strncmp(param, "gender", val - param)) {
+      requestParameter.gender = *(val + 1);
+    } else if (0 == strncmp(param, "fromAge", val - param)) {
+      int32_t fromAge;
+      PARSE_INT32(fromAge, val + 1);
+      struct tm fromTime = currentTime;
+      fromTime.tm_year -= fromAge;
+      requestParameter.age.first = static_cast<int32_t>(timegm(&fromTime));
+    } else if (0 == strncmp(param, "toAge", val - param)) {
+      int32_t toAge;
+      PARSE_INT32(toAge, val + 1);
+      struct tm toTime = currentTime;
+      toTime.tm_year -= toAge;
+      requestParameter.age.second = static_cast<int32_t>(timegm(&toTime));
+    } else {
+      return Result::FAILED;
+    }
+
+    if (next) {
+      param = next + 1;
+    }
+  } while (next);
+
+  uint64_t sum = 0;
+  uint64_t count = 0;
+
+  for (const auto& visit : visits_) {
+    if (requestParameter.valid(visit.second)) {
+      ++ count;
+      sum += visit.second.second->mark;
+    }
   }
 
+  double avg = 0;
+  if (count) {
+    avg = (1.0 * sum) / count;
+  }
+
+  result.reserve(32);
   result += "{";
   result += "\"avg\":" + db::to_string(avg);
   result += "}";

@@ -20,8 +20,8 @@ struct User
   std::string email;
   std::string first_name;
   std::string last_name;
-  int64_t birth_date;
-  uint16_t gender;
+  int32_t birth_date;
+  char gender;
 
   std::unordered_map<int32_t, Visit*> visits_;
 
@@ -30,7 +30,7 @@ struct User
     std::string&& _first_name,
     std::string&& _last_name,
     const int32_t _birth_date,
-    const uint16_t _gender);
+    const char _gender);
   User(const rapidjson::Value& jsonVal);
   bool update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);

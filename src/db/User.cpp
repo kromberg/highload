@@ -3,6 +3,7 @@
 
 #include <rapidjson/stringbuffer.h>
 
+#include "Utils.h"
 #include "Location.h"
 #include "User.h"
 
@@ -13,7 +14,7 @@ User::User(
   std::string&& _first_name,
   std::string&& _last_name,
   const int32_t _birth_date,
-  const uint16_t _gender):
+  const char _gender):
   email(std::move(_email)),
   first_name(std::move(_first_name)),
   last_name(std::move(_last_name)),
@@ -26,13 +27,8 @@ User::User(const rapidjson::Value& jsonVal)
   email = std::string(jsonVal["email"].GetString());
   first_name = std::string(jsonVal["first_name"].GetString());
   last_name = std::string(jsonVal["last_name"].GetString());
-  birth_date = jsonVal["birth_date"].GetInt64();
-  const char* genderStr = jsonVal["gender"].GetString();
-  if (*genderStr == 'f') {
-    gender = false;
-  } else if (*genderStr == 'm') {
-    gender = true;
-  }
+  birth_date = jsonVal["birth_date"].GetInt();
+  gender = *jsonVal["gender"].GetString();
 }
 
 bool User::update(const rapidjson::Value& jsonVal)
@@ -76,11 +72,9 @@ bool User::update(const rapidjson::Value& jsonVal)
     if (!val.IsString()) {
       return false;
     }
-    const char* genderStr = val.GetString();
-    if (*genderStr == 'f') {
-      tmp.gender = false;
-    } else if (*genderStr == 'm') {
-      tmp.gender = true;
+    tmp.gender = *val.GetString();
+    if (tmp.gender != 'f' && tmp.gender != 'm') {
+      return false;
     }
   }
 
@@ -111,12 +105,12 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
     std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
     const char* country = nullptr;
     int32_t countrySize = 0;
-    int32_t toDinstance = std::numeric_limits<int32_t>::max();
+    int32_t toDistance = std::numeric_limits<int32_t>::max();
     bool valid(const Visit& visit) const
     {
       return (visit.visited_at > date.first && visit.visited_at < date.second &&
               ((0 == countrySize) || (0 == visit.location_->country.compare(0, std::string::npos, country, countrySize))) &&
-              (visit.location_->distance < toDinstance));
+              (visit.location_->distance < toDistance));
     }
   } requestParameter;
   // parse parameters
@@ -127,7 +121,22 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
       *next = '\0';
     }
     // parse parameter
-
+    char* val = strchr(param, '=');
+    if (!val) {
+      return Result::FAILED;
+    }
+    if (0 == strncmp(param, "fromDate", val - param)) {
+      PARSE_INT32(requestParameter.date.first, val + 1);
+    } else if (0 == strncmp(param, "toDate", val - param)) {
+      PARSE_INT32(requestParameter.date.second, val + 1);
+    } else if (0 == strncmp(param, "country", val - param)) {
+      requestParameter.country = val + 1;
+      requestParameter.countrySize = strlen(val + 1);
+    } else if (0 == strncmp(param, "toDistance", val - param)) {
+      PARSE_INT32(requestParameter.toDistance, val + 1);
+    } else {
+      return Result::FAILED;
+    }
 
     if (next) {
       param = next + 1;
@@ -139,7 +148,7 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
     if (requestParameter.valid(*visit.second)) {
       visits.emplace(
         std::piecewise_construct,
-        std::forward_as_tuple(visit.second->mark),
+        std::forward_as_tuple(visit.second->visited_at),
         std::forward_as_tuple(visit.second));
     }
   }
