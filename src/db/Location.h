@@ -7,11 +7,15 @@
 
 #include <rapidjson/document.h>
 
+#include <common/Types.h>
+
 #include "User.h"
 #include "Visit.h"
 
 namespace db
 {
+using common::Result;
+
 struct Location
 {
   std::string place;
@@ -29,7 +33,7 @@ struct Location
   Location(const rapidjson::Value& jsonVal);
   bool update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
-  std::string getJsonAvgScore(const char* params, const int32_t paramsSize);
+  Result getJsonAvgScore(std::string& result, const char* params, const int32_t paramsSize);
 };
 } // namespace db
 #endif // _DB_LOCATION_H_

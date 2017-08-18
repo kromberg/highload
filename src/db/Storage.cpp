@@ -335,18 +335,66 @@ Result Storage::addLocation(const rapidjson::Value& jsonVal)
 
 Result Storage::addVisit(const rapidjson::Value& jsonVal)
 {
+  using namespace rapidjson;
   if (!jsonVal.HasMember("id")) {
     return Result::FAILED;
   }
-  const int32_t id = jsonVal["id"].GetInt();
+  int32_t id;
+  {
+    const Value& val = jsonVal["id"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    id = val.GetInt();
+  }
+
   if (!jsonVal.HasMember("location")) {
     return Result::FAILED;
   }
-  const int32_t locationId = jsonVal["location"].GetInt();
+  int32_t locationId;
+  {
+    const Value& val = jsonVal["location"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    locationId = val.GetInt();
+  }
+
   if (!jsonVal.HasMember("user")) {
     return Result::FAILED;
   }
-  const int32_t userId = jsonVal["user"].GetInt();
+  int32_t userId;
+  {
+    const Value& val = jsonVal["user"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    userId = val.GetInt();
+  }
+
+  if (!jsonVal.HasMember("visited_at")) {
+    return Result::FAILED;
+  }
+  int32_t visited_at;
+  {
+    const Value& val = jsonVal["visited_at"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    visited_at = val.GetInt();
+  }
+
+  if (!jsonVal.HasMember("mark")) {
+    return Result::FAILED;
+  }
+  int32_t mark;
+  {
+    const Value& val = jsonVal["mark"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    mark = val.GetInt();
+  }
 
   tbb::spin_rw_mutex::scoped_lock usersLock(usersGuard_, false);
   auto userIt = users_.find(userId);
@@ -368,7 +416,7 @@ Result Storage::addVisit(const rapidjson::Value& jsonVal)
   auto res = visits_.emplace(
     std::piecewise_construct,
     std::forward_as_tuple(id),
-    std::forward_as_tuple(locationId, userId, location, user, jsonVal));
+    std::forward_as_tuple(locationId, userId, visited_at, mark, location, user));
   Visit* visit = &res.first->second;
 
   user->visits_.emplace(
@@ -416,13 +464,70 @@ Result Storage::updateLocation(const int32_t id, const rapidjson::Value& jsonVal
 
 Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
 {
+  using namespace rapidjson;
+
+  tbb::spin_rw_mutex::scoped_lock usersLock;
+  int32_t userId = -1;
+  User *user = nullptr;
+  if (jsonVal.HasMember("user")) {
+    const Value& val = jsonVal["user"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    userId = val.GetInt();
+    usersLock.acquire(usersGuard_, false);
+    auto userIt = users_.find(userId);
+    if (users_.end() == userIt) {
+      return Result::NOT_FOUND;
+    }
+    user = &userIt->second;
+  }
+
+  tbb::spin_rw_mutex::scoped_lock locationsLock;
+  int32_t locationId = -1;
+  Location *location = nullptr;
+  if (jsonVal.HasMember("location")) {
+    const Value& val = jsonVal["location"];
+    if (!val.IsInt()) {
+      return Result::FAILED;
+    }
+    locationId = val.GetInt();
+
+    locationsLock.acquire(locationsGuard_, false);
+    auto locationIt = locations_.find(locationId);
+    if (locations_.end() == locationIt) {
+      return Result::NOT_FOUND;
+    }
+    location = &locationIt->second;
+  }
+
+  if (user) {
+    usersLock.upgrade_to_writer();
+  }
+  if (location) {
+    locationsLock.upgrade_to_writer();
+  }
   tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, false);
   auto it = visits_.find(id);
   if (visits_.end() == it) {
     return Result::NOT_FOUND;
   }
+  const int32_t prevLocation = it->second.location;
+  const int32_t prevUser = it->second.user;
   l.upgrade_to_writer();
-  it->second.update(jsonVal);
+  if (!it->second.update(locationId, userId, jsonVal)) {
+    return Result::FAILED;
+  }
+
+  if (user && prevUser != userId) {
+    it->second.user_ = user;
+    user->visits_[id] = &it->second;
+  }
+
+  if (location && prevLocation != locationId) {
+    it->second.location_ = location;
+    location->visits_[id] = std::make_pair(it->second.user_, &it->second);
+  }
 
   return Result::SUCCESS;
 }
@@ -467,8 +572,7 @@ Result Storage::getUserVisits(std::string& resp, const int32_t id, const char* p
   if (users_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = std::move(it->second.getJsonVisits(params, paramsSize));
-  return Result::SUCCESS;
+  return it->second.getJsonVisits(resp, params, paramsSize);
 }
 
 Result Storage::getLocationAvgScore(std::string& resp, const int32_t id, const char* params, const int32_t paramsSize)
@@ -478,8 +582,7 @@ Result Storage::getLocationAvgScore(std::string& resp, const int32_t id, const c
   if (locations_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = std::move(it->second.getJsonAvgScore(params, paramsSize));
-  return Result::SUCCESS;
+  return it->second.getJsonAvgScore(resp, params, paramsSize);
 }
 
 } // namespace db

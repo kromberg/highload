@@ -93,7 +93,9 @@ HTTPCode StateMachine::addUser(std::string& resp, db::Storage& storage, Request&
 HTTPCode StateMachine::addLocation(std::string& resp, db::Storage& storage, Request& req)
 {
   Result res = storage.addLocation(req.json_);
-  if (Result::SUCCESS != res) {
+  if (Result::NOT_FOUND == res) {
+    return HTTPCode::NOT_FOUND;
+  } else if (Result::SUCCESS != res) {
     return HTTPCode::BAD_REQ;
   }
 
@@ -113,7 +115,9 @@ HTTPCode StateMachine::addVisit(std::string& resp, db::Storage& storage, Request
 HTTPCode StateMachine::updateUser(std::string& resp, db::Storage& storage, Request& req)
 {
   Result res = storage.updateUser(req.id_, req.json_);
-  if (Result::SUCCESS != res) {
+  if (Result::NOT_FOUND == res) {
+    return HTTPCode::NOT_FOUND;
+  } else if (Result::SUCCESS != res) {
     return HTTPCode::BAD_REQ;
   }
 
@@ -123,7 +127,9 @@ HTTPCode StateMachine::updateUser(std::string& resp, db::Storage& storage, Reque
 HTTPCode StateMachine::updateLocation(std::string& resp, db::Storage& storage, Request& req)
 {
   Result res = storage.updateLocation(req.id_, req.json_);
-  if (Result::SUCCESS != res) {
+  if (Result::NOT_FOUND == res) {
+    return HTTPCode::NOT_FOUND;
+  } else if (Result::SUCCESS != res) {
     return HTTPCode::BAD_REQ;
   }
 
@@ -133,7 +139,9 @@ HTTPCode StateMachine::updateLocation(std::string& resp, db::Storage& storage, R
 HTTPCode StateMachine::updateVisit(std::string& resp, db::Storage& storage, Request& req)
 {
   Result res = storage.updateVisit(req.id_, req.json_);
-  if (Result::SUCCESS != res) {
+  if (Result::NOT_FOUND == res) {
+    return HTTPCode::NOT_FOUND;
+  } else if (Result::SUCCESS != res) {
     return HTTPCode::BAD_REQ;
   }
 

@@ -1,3 +1,6 @@
+#include <map>
+#include <limits>
+
 #include <rapidjson/stringbuffer.h>
 
 #include "Location.h"
@@ -101,34 +104,34 @@ std::string User::getJson(int32_t id)
   return str;
 }
 
-std::string User::getJsonVisits(const char* params, const int32_t paramsSize)
+Result User::getJsonVisits(std::string& result, const char* params, const int32_t paramsSize)
 {
-  std::string str;
-
   struct Parameters
   {
-    std::pair<int32_t, int32_t> date;
+    std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
+
   };
   // TODO: parse parameters
 
-  if (visits_.empty()) {
-    return std::string();
-  }
+  std::map<int32_t, Visit*> visits;
+  //std::transform(visits_.begin(), visits_.end(), visits.begin());
 
-  str.reserve(512);
-  str.clear();
-  str += "{";
-  str += "\"visits\":[";
-  for (auto visit : visits_) {
-    str += "{";
-    str += "\"mark\":" + std::to_string(visit.second->mark) + ",";
-    str += "\"visited_at\":" + std::to_string(visit.second->visited_at) + ",";
-    str += "\"place\":\"" + visit.second->location_->place + "\"";
-    str += "},";
+  result.reserve(512);
+  result.clear();
+  result += "{";
+  result += "\"visits\":[";
+  for (auto visit : visits) {
+    result += "{";
+    result += "\"mark\":" + std::to_string(visit.second->mark) + ",";
+    result += "\"visited_at\":" + std::to_string(visit.second->visited_at) + ",";
+    result += "\"place\":\"" + visit.second->location_->place + "\"";
+    result += "},";
   }
-  str.pop_back();
-  str += "]";
-  str += "}";
-  return str;
+  if (!visits.empty()) {
+    result.pop_back();
+  }
+  result += "]";
+  result += "}";
+  return Result::SUCCESS;
 }
 } // namespace db

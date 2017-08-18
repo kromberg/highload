@@ -88,10 +88,9 @@ static std::string to_string(const double val)
   return ss.str();
 }
 
-std::string Location::getJsonAvgScore(const char* params, const int32_t paramsSize)
+Result Location::getJsonAvgScore(std::string& result, const char* params, const int32_t paramsSize)
 {
-  std::string str;
-  str.reserve(32);
+  result.reserve(32);
   double avg = 0;
   size_t count = 0;
   for (auto& visitEntry : visits_) {
@@ -103,10 +102,10 @@ std::string Location::getJsonAvgScore(const char* params, const int32_t paramsSi
     avg /= count;
   }
 
-  str += "{";
-  str += "\"avg\":" + db::to_string(avg);
-  str += "}";
-  return str;
+  result += "{";
+  result += "\"avg\":" + db::to_string(avg);
+  result += "}";
+  return Result::SUCCESS;
 }
 
 } // namespace db

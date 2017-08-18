@@ -24,10 +24,17 @@ struct Visit
   Visit(
     const int32_t locationId,
     const int32_t userId,
+    const int32_t _visited_at,
+    const uint16_t _mark,
+    Location* _location,
+    User* _user);
+  Visit(
+    const int32_t locationId,
+    const int32_t userId,
     Location* _location,
     User* _user,
     const rapidjson::Value& jsonVal);
-  void update(const rapidjson::Value& jsonVal);
+  bool update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
 };
 } // namespace db

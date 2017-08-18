@@ -7,10 +7,14 @@
 
 #include <rapidjson/document.h>
 
+#include <common/Types.h>
+
 #include "Visit.h"
 
 namespace db
 {
+using common::Result;
+
 struct User
 {
   std::string email;
@@ -30,7 +34,7 @@ struct User
   User(const rapidjson::Value& jsonVal);
   bool update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
-  std::string getJsonVisits(const char* params, const int32_t paramsSize);
+  Result getJsonVisits(std::string& result, const char* params, const int32_t paramsSize);
 };
 } // namespace db
 #endif // _DB_USER_H_

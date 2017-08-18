@@ -5,12 +5,20 @@
 
 namespace db
 {
-Visit::Visit(const rapidjson::Value& jsonVal)
+Visit::Visit(
+  const int32_t locationId,
+  const int32_t userId,
+  const int32_t _visited_at,
+  const uint16_t _mark,
+  Location* _location,
+  User* _user):
+  location(locationId),
+  user(userId),
+  visited_at(_visited_at),
+  mark(_mark),
+  location_(_location),
+  user_(_user)
 {
-  location = jsonVal["location"].GetInt();
-  user = jsonVal["user"].GetInt();
-  visited_at = jsonVal["visited_at"].GetInt();
-  mark = jsonVal["mark"].GetInt();
 }
 
 Visit::Visit(
@@ -28,21 +36,37 @@ Visit::Visit(
   mark = jsonVal["mark"].GetInt();
 }
 
-void Visit::update(const rapidjson::Value& jsonVal)
+bool Visit::update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal)
 {
-  if (jsonVal.HasMember("location")) {
-    location = jsonVal["location"].GetInt();
+  using namespace rapidjson;
+  Visit tmp(*this);
+  if (-1 != locationId) {
+    tmp.location = locationId;
   }
-  if (jsonVal.HasMember("user")) {
-    user = jsonVal["user"].GetInt();
+
+  if (-1 != userId) {
+    tmp.user = userId;
   }
+
   if (jsonVal.HasMember("visited_at")) {
-    visited_at = jsonVal["visited_at"].GetInt();
+    const Value& val = jsonVal["visited_at"];
+    if (!val.IsInt()) {
+      return false;
+    }
+    tmp.visited_at = val.GetInt();
   }
+
   if (jsonVal.HasMember("mark")) {
-    mark = jsonVal["mark"].GetInt();
+    const Value& val = jsonVal["mark"];
+    if (!val.IsInt()) {
+      return false;
+    }
+    tmp.mark = val.GetInt();
   }
+  *this = std::move(tmp);
+  return true;
 }
+
 std::string Visit::getJson(int32_t id)
 {
   std::string str;
