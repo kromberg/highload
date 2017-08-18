@@ -16,9 +16,9 @@ private:
   void handleRequest(tcp::Socket&& sock);
   virtual void acceptSocket(tcp::Socket&& sock) override;
 
-  HTTPCode parseURL(Request& req, const char* url, int32_t size);
+  HTTPCode parseURL(Request& req, char* url, int32_t size);
   HTTPCode parseRequestMethod(Request& req, char* reqMethod, int32_t size);
-  HTTPCode parseHeader(Request& req, bool& hasNext, const char* header, int32_t size);
+  HTTPCode parseHeader(Request& req, bool& hasNext, char* header, int32_t size);
   HTTPCode readRequest(Request& req, tcp::Socket& sock);
 
   void sendResponse(tcp::Socket& sock, const HTTPCode code, const std::string& body);
