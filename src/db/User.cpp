@@ -104,17 +104,45 @@ std::string User::getJson(int32_t id)
   return str;
 }
 
-Result User::getJsonVisits(std::string& result, const char* params, const int32_t paramsSize)
+Result User::getJsonVisits(std::string& result, char* params, const int32_t paramsSize)
 {
   struct Parameters
   {
     std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
+    const char* country = nullptr;
+    int32_t countrySize = 0;
+    int32_t toDinstance = std::numeric_limits<int32_t>::max();
+    bool valid(const Visit& visit) const
+    {
+      return (visit.visited_at > date.first && visit.visited_at < date.second &&
+              ((0 == countrySize) || (0 == visit.location_->country.compare(0, std::string::npos, country, countrySize))) &&
+              (visit.location_->distance < toDinstance));
+    }
+  } requestParameter;
+  // parse parameters
+  char* next = nullptr, *param = params;
+  do {
+    char* next = strchr(param, '&');
+    if (next) {
+      *next = '\0';
+    }
+    // parse parameter
 
-  };
-  // TODO: parse parameters
+
+    if (next) {
+      param = next + 1;
+    }
+  } while (next);
 
   std::map<int32_t, Visit*> visits;
-  //std::transform(visits_.begin(), visits_.end(), visits.begin());
+  for (const auto& visit : visits_) {
+    if (requestParameter.valid(*visit.second)) {
+      visits.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(visit.second->mark),
+        std::forward_as_tuple(visit.second));
+    }
+  }
 
   result.reserve(512);
   result.clear();

@@ -565,7 +565,7 @@ Result Storage::getVisit(std::string& resp, const int32_t id)
   return Result::SUCCESS;
 }
 
-Result Storage::getUserVisits(std::string& resp, const int32_t id, const char* params, const int32_t paramsSize)
+Result Storage::getUserVisits(std::string& resp, const int32_t id, char* params, const int32_t paramsSize)
 {
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
@@ -575,7 +575,7 @@ Result Storage::getUserVisits(std::string& resp, const int32_t id, const char* p
   return it->second.getJsonVisits(resp, params, paramsSize);
 }
 
-Result Storage::getLocationAvgScore(std::string& resp, const int32_t id, const char* params, const int32_t paramsSize)
+Result Storage::getLocationAvgScore(std::string& resp, const int32_t id, char* params, const int32_t paramsSize)
 {
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);

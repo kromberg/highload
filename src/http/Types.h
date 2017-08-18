@@ -48,7 +48,7 @@ struct Request
   Table table1_ = Table::NONE;
   Table table2_ = Table::NONE;
   int32_t id_ = -1;
-  const char* params_;
+  char* params_;
   int32_t paramsSize_;
 
   bool hasContentType_ = false;
