@@ -36,7 +36,7 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
     { "avg",       Table::AVG },
   };
 
-  //LOG(stderr, "URL: %s\n", url);
+  LOG(stderr, "URL: %s\n", url);
 
   if (urlSize <= 0) {
     return HTTPCode::BAD_REQ;
@@ -52,11 +52,12 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
 
   char* next = strchr(url + 1, '?');
   if (next) {
+    LOG(stderr, "next: %c\n", *next);
     *next = '\0';
     req.params_ = next + 1;
-    req.paramsSize_ = urlSize - (next - url);
-    urlSize -= req.paramsSize_; 
-    //LOG(stderr, "PARAMS: %s\n", req.params_);
+    req.paramsSize_ = urlSize - (req.params_ - url);
+    urlSize -= (req.paramsSize_ + 1); 
+    LOG(stderr, "PARAMS: %s\n", req.params_);
   }
 
   char* prev = nullptr;
@@ -77,17 +78,17 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
       case State::TABLE1:
       case State::TABLE2:
       {
-        //LOG(stderr, "Searching for table: %s\n", prev);
+        LOG(stderr, "Searching for table: %s\n", prev);
         auto it = strToTableMap.find(std::string(prev, size));
         if (strToTableMap.end() == it) {
           return HTTPCode::BAD_REQ;
         }
         if (State::TABLE1 == state) {
-          //LOG(stderr, "TABLE 1: %s\n", prev);
+          LOG(stderr, "TABLE 1: %s\n", prev);
           req.table1_ = it->second;
           state = State::ID;
         } else {
-          //LOG(stderr, "TABLE 2: %s\n", prev);
+          LOG(stderr, "TABLE 2: %s\n", prev);
           req.table2_ = it->second;
           state = State::ERROR;
         }
@@ -95,7 +96,7 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
       }
       case State::ID:
       {
-        //LOG(stderr, "ID: %s\n", prev);
+        LOG(stderr, "ID: %s\n", prev);
         if (0 == strncmp(prev, "new", size)) {
           req.id_ = -1;
         } else {
@@ -109,10 +110,10 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
         break;
       }
       case State::ERROR:
-        //LOG(stderr, "Error state\n");
+        LOG(stderr, "Error state\n");
         return HTTPCode::BAD_REQ;
     }
-    //LOG(stderr, "New state = %d\n", state);
+    LOG(stderr, "New state = %d\n", state);
 
   } while (next);
 
@@ -145,6 +146,7 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, char* reqMethod, int32_t s
   *next = '\0';
   HTTPCode code = parseURL(req, reqMethod, next - reqMethod);
   if (HTTPCode::OK != code) {
+    LOG(stderr, "Parsing URL error code = %d\n", code);
     return code;
   }
 
@@ -190,7 +192,7 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
-    //LOG(stderr, "Cannot find handler");
+    LOG(stderr, "Cannot find handler");
     sendResponse(sock, code, body);
     return ;
   }
@@ -229,7 +231,6 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         if (size - offset < req.contentLength_) {
           continue;
         }
-        //LOG(stderr, "Content:\n%s\n\n", buffer + offset);
         if (req.json_.Parse(buffer + offset).HasParseError()) {
           return HTTPCode::BAD_REQ;
         }
@@ -241,10 +242,10 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         switch (state) {
           case State::METHOD:
           {
-            //LOG(stderr, "Method : %s\n\n", buffer + offset);
+            LOG(stderr, "Method : %s\n\n", buffer + offset);
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
             if (HTTPCode::OK != code) {
-              //LOG(stderr, "Method : %s. Code : %d\n\n", buffer + offset, code);
+              LOG(stderr, "Method : %s. Code : %d\n\n", buffer + offset, code);
               return code;
             }
             state = State::HEADERS;
@@ -252,11 +253,11 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
           }
           case State::HEADERS:
           {
-            //LOG(stderr, "Header : %s\n\n", buffer + offset);
+            LOG(stderr, "Header : %s\n\n", buffer + offset);
             bool hasNext;
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
             if (HTTPCode::OK != code) {
-              //LOG(stderr, "Header : %s\n\n", buffer + offset);
+              LOG(stderr, "Header : %s. Code : %d\n\n", buffer + offset, code);
               return code;
             }
             if (!hasNext) {
@@ -269,7 +270,6 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         }
         offset = next - buffer + 1;
         if (State::BODY == state) {
-          //LOG(stderr, "size: %d, offset: %d, content-length: %d\n", size, offset, req.contentLength_);
           if (Type::GET == req.type_) {
             return HTTPCode::OK;
           }
@@ -277,7 +277,6 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
             break;
           }
           state = State::END;
-          //LOG(stderr, "Content:\n%s\n\n", buffer + offset);
           if (req.json_.Parse(buffer + offset).HasParseError()) {
             return HTTPCode::BAD_REQ;
           }

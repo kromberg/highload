@@ -103,38 +103,51 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
   struct Parameters
   {
     std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
-    const char* country = nullptr;
+    char* country = nullptr;
     int32_t countrySize = 0;
     int32_t toDistance = std::numeric_limits<int32_t>::max();
+    ~Parameters()
+    {
+      delete[] country;
+    }
     bool valid(const Visit& visit) const
     {
-      return (visit.visited_at > date.first && visit.visited_at < date.second &&
+      return ((visit.visited_at > date.first) && (visit.visited_at < date.second) &&
               ((0 == countrySize) || (0 == visit.location_->country.compare(0, std::string::npos, country, countrySize))) &&
               (visit.location_->distance < toDistance));
+    }
+    void dump() const
+    {
+      LOG(stderr, "date.first = %d\ndate.second = %d\ncountry = %s\ndistance = %d\n",
+        date.first, date.second, country ? country : "null", toDistance);
     }
   } requestParameter;
   if (params) {
     // parse parameters
     char* next = nullptr, *param = params;
     do {
-      char* next = strchr(param, '&');
+      next = strchr(param, '&');
+      char *paramEnd;
       if (next) {
         *next = '\0';
+        paramEnd = next;
+      } else {
+        paramEnd = params + paramsSize;
       }
       // parse parameter
+      LOG(stderr, "Parsing parameter %s\n", param);
       char* val = strchr(param, '=');
       if (!val) {
         return Result::FAILED;
       }
       if (0 == strncmp(param, "fromDate", val - param)) {
-        PARSE_INT32(requestParameter.date.first, val + 1);
+        PARSE_INT32(requestParameter.date.first, val + 1, paramEnd);
       } else if (0 == strncmp(param, "toDate", val - param)) {
-        PARSE_INT32(requestParameter.date.second, val + 1);
+        PARSE_INT32(requestParameter.date.second, val + 1, paramEnd);
       } else if (0 == strncmp(param, "country", val - param)) {
-        requestParameter.country = val + 1;
-        requestParameter.countrySize = strlen(val + 1);
+        uriDecode(requestParameter.country, requestParameter.countrySize, val + 1, strlen(val + 1));
       } else if (0 == strncmp(param, "toDistance", val - param)) {
-        PARSE_INT32(requestParameter.toDistance, val + 1);
+        PARSE_INT32(requestParameter.toDistance, val + 1, paramEnd);
       } else {
         return Result::FAILED;
       }
@@ -144,6 +157,7 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
       }
     } while (next);
   }
+  requestParameter.dump();
 
   std::map<int32_t, Visit*> visits;
   for (const auto& visit : visits_) {
