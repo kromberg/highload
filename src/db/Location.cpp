@@ -107,44 +107,46 @@ Result Location::getJsonAvgScore(std::string& result, char* params, const int32_
               (!gender || visit.first->gender == gender));
     }
   } requestParameter;
-  // parse parameters
-  char* next = nullptr, *param = params;
-  do {
-    char* next = strchr(param, '&');
-    if (next) {
-      *next = '\0';
-    }
-    // parse parameter
-    char* val = strchr(param, '=');
-    if (!val) {
-      return Result::FAILED;
-    }
-    if (0 == strncmp(param, "fromDate", val - param)) {
-      PARSE_INT32(requestParameter.date.first, val + 1);
-    } else if (0 == strncmp(param, "toDate", val - param)) {
-      PARSE_INT32(requestParameter.date.second, val + 1);
-    } else if (0 == strncmp(param, "gender", val - param)) {
-      requestParameter.gender = *(val + 1);
-    } else if (0 == strncmp(param, "fromAge", val - param)) {
-      int32_t fromAge;
-      PARSE_INT32(fromAge, val + 1);
-      struct tm fromTime = currentTime;
-      fromTime.tm_year -= fromAge;
-      requestParameter.age.first = static_cast<int32_t>(timegm(&fromTime));
-    } else if (0 == strncmp(param, "toAge", val - param)) {
-      int32_t toAge;
-      PARSE_INT32(toAge, val + 1);
-      struct tm toTime = currentTime;
-      toTime.tm_year -= toAge;
-      requestParameter.age.second = static_cast<int32_t>(timegm(&toTime));
-    } else {
-      return Result::FAILED;
-    }
+  if (params) {
+    // parse parameters
+    char* next = nullptr, *param = params;
+    do {
+      char* next = strchr(param, '&');
+      if (next) {
+        *next = '\0';
+      }
+      // parse parameter
+      char* val = strchr(param, '=');
+      if (!val) {
+        return Result::FAILED;
+      }
+      if (0 == strncmp(param, "fromDate", val - param)) {
+        PARSE_INT32(requestParameter.date.first, val + 1);
+      } else if (0 == strncmp(param, "toDate", val - param)) {
+        PARSE_INT32(requestParameter.date.second, val + 1);
+      } else if (0 == strncmp(param, "gender", val - param)) {
+        requestParameter.gender = *(val + 1);
+      } else if (0 == strncmp(param, "fromAge", val - param)) {
+        int32_t fromAge;
+        PARSE_INT32(fromAge, val + 1);
+        struct tm fromTime = currentTime;
+        fromTime.tm_year -= fromAge;
+        requestParameter.age.first = static_cast<int32_t>(timegm(&fromTime));
+      } else if (0 == strncmp(param, "toAge", val - param)) {
+        int32_t toAge;
+        PARSE_INT32(toAge, val + 1);
+        struct tm toTime = currentTime;
+        toTime.tm_year -= toAge;
+        requestParameter.age.second = static_cast<int32_t>(timegm(&toTime));
+      } else {
+        return Result::FAILED;
+      }
 
-    if (next) {
-      param = next + 1;
-    }
-  } while (next);
+      if (next) {
+        param = next + 1;
+      }
+    } while (next);
+  }
 
   uint64_t sum = 0;
   uint64_t count = 0;
@@ -162,6 +164,7 @@ Result Location::getJsonAvgScore(std::string& result, char* params, const int32_
   }
 
   result.reserve(32);
+  result.clear();
   result += "{";
   result += "\"avg\":" + db::to_string(avg);
   result += "}";

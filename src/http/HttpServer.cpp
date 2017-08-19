@@ -55,6 +55,7 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
     *next = '\0';
     req.params_ = next + 1;
     req.paramsSize_ = urlSize - (next - url);
+    urlSize -= req.paramsSize_; 
     //LOG(stderr, "PARAMS: %s\n", req.params_);
   }
 
@@ -76,6 +77,7 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
       case State::TABLE1:
       case State::TABLE2:
       {
+        //LOG(stderr, "Searching for table: %s\n", prev);
         auto it = strToTableMap.find(std::string(prev, size));
         if (strToTableMap.end() == it) {
           return HTTPCode::BAD_REQ;
@@ -103,11 +105,14 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
             return HTTPCode::NOT_FOUND;
           }
         }
+        state = State::TABLE2;
         break;
       }
       case State::ERROR:
+        //LOG(stderr, "Error state\n");
         return HTTPCode::BAD_REQ;
     }
+    //LOG(stderr, "New state = %d\n", state);
 
   } while (next);
 
@@ -185,6 +190,7 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
+    //LOG(stderr, "Cannot find handler");
     sendResponse(sock, code, body);
     return ;
   }
@@ -235,8 +241,10 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         switch (state) {
           case State::METHOD:
           {
+            //LOG(stderr, "Method : %s\n\n", buffer + offset);
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
             if (HTTPCode::OK != code) {
+              //LOG(stderr, "Method : %s. Code : %d\n\n", buffer + offset, code);
               return code;
             }
             state = State::HEADERS;
@@ -244,9 +252,11 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
           }
           case State::HEADERS:
           {
+            //LOG(stderr, "Header : %s\n\n", buffer + offset);
             bool hasNext;
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
             if (HTTPCode::OK != code) {
+              //LOG(stderr, "Header : %s\n\n", buffer + offset);
               return code;
             }
             if (!hasNext) {

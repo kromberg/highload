@@ -93,7 +93,7 @@ std::string User::getJson(int32_t id)
   str += "\"first_name\":\"" + first_name + "\",";
   str += "\"last_name\":\"" + last_name + "\",";
   str += "\"birth_date\":" + std::to_string(birth_date) + ",";
-  str += "\"gender\":\"" + std::string(gender ? "m" : "f") + "\"";
+  str += "\"gender\":\"" + std::string(1, gender) + "\"";
   str += "}";
   return str;
 }
@@ -113,35 +113,37 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
               (visit.location_->distance < toDistance));
     }
   } requestParameter;
-  // parse parameters
-  char* next = nullptr, *param = params;
-  do {
-    char* next = strchr(param, '&');
-    if (next) {
-      *next = '\0';
-    }
-    // parse parameter
-    char* val = strchr(param, '=');
-    if (!val) {
-      return Result::FAILED;
-    }
-    if (0 == strncmp(param, "fromDate", val - param)) {
-      PARSE_INT32(requestParameter.date.first, val + 1);
-    } else if (0 == strncmp(param, "toDate", val - param)) {
-      PARSE_INT32(requestParameter.date.second, val + 1);
-    } else if (0 == strncmp(param, "country", val - param)) {
-      requestParameter.country = val + 1;
-      requestParameter.countrySize = strlen(val + 1);
-    } else if (0 == strncmp(param, "toDistance", val - param)) {
-      PARSE_INT32(requestParameter.toDistance, val + 1);
-    } else {
-      return Result::FAILED;
-    }
+  if (params) {
+    // parse parameters
+    char* next = nullptr, *param = params;
+    do {
+      char* next = strchr(param, '&');
+      if (next) {
+        *next = '\0';
+      }
+      // parse parameter
+      char* val = strchr(param, '=');
+      if (!val) {
+        return Result::FAILED;
+      }
+      if (0 == strncmp(param, "fromDate", val - param)) {
+        PARSE_INT32(requestParameter.date.first, val + 1);
+      } else if (0 == strncmp(param, "toDate", val - param)) {
+        PARSE_INT32(requestParameter.date.second, val + 1);
+      } else if (0 == strncmp(param, "country", val - param)) {
+        requestParameter.country = val + 1;
+        requestParameter.countrySize = strlen(val + 1);
+      } else if (0 == strncmp(param, "toDistance", val - param)) {
+        PARSE_INT32(requestParameter.toDistance, val + 1);
+      } else {
+        return Result::FAILED;
+      }
 
-    if (next) {
-      param = next + 1;
-    }
-  } while (next);
+      if (next) {
+        param = next + 1;
+      }
+    } while (next);
+  }
 
   std::map<int32_t, Visit*> visits;
   for (const auto& visit : visits_) {
