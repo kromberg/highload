@@ -12,14 +12,43 @@
 namespace http
 {
 
-#define RESPONSE_HEADER_FORMAT \
-  "HTTP/1.1 %d %s\n"\
+static const char* RESPONSE_200 = \
+  "HTTP/1.1 200 OK\n"\
   "Content-Type: application/json; charset=UTF-8\n"\
   "Connection: close\n"\
-  "Content-Length: %zu\n"\
+  "Content-Length: 2\n"\
   "\n"\
+  "{}";
+#define RESPONSE_200_SIZE 101
 
-#define RESPONSE_HEADER_ESTIMATED_SIZE 94 + 3 + 64 + 4
+static const char* RESPONSE_400 = \
+  "HTTP/1.1 400 Bad Request\n"\
+  "Content-Type: application/json; charset=UTF-8\n"\
+  "Connection: close\n"\
+  "Content-Length: 2\n"\
+  "\n"\
+  "{}";
+#define RESPONSE_400_SIZE 110
+
+static const char* RESPONSE_404 = \
+  "HTTP/1.1 404 Not Found\n"\
+  "Content-Type: application/json; charset=UTF-8\n"\
+  "Connection: close\n"\
+  "Content-Length: 2\n"\
+  "\n"\
+  "{}";
+#define RESPONSE_404_SIZE 108
+
+static const char* RESPONSE_200_PART1 = \
+  "HTTP/1.1 200 OK\n"\
+  "Content-Type: application/json; charset=UTF-8\n"\
+  "Connection: close\n"\
+  "Content-Length: ";
+#define RESPONSE_200_PART1_SIZE 96
+
+#define RESPONSE_200_PART2 \
+  "%zu\n"\
+  "\n"
 
 HttpServer::HttpServer(db::StoragePtr& storage):
   tcp::TcpServer(),
@@ -164,7 +193,7 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
     hasNext = false;
     return HTTPCode::OK;
   }
-  //LOG(stderr, "HEADER: %s\n", header);
+  LOG(stderr, "HEADER: %s\n", header);
   char* val = strchr(header, ':');
   if (!val || (val - header) > size) {
     return HTTPCode::BAD_REQ;
@@ -185,28 +214,32 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
 
 void HttpServer::handleRequest(tcp::Socket&& sock)
 {
-  std::string body("{}");
   Request req;
   HTTPCode code = readRequest(req, sock);
   if (HTTPCode::OK != code) {
-    sendResponse(sock, code, body);
+    sendResponse(sock, code);
     return ;
   }
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
     LOG(stderr, "Cannot find handler");
-    sendResponse(sock, code, body);
+    sendResponse(sock, code);
     return ;
   }
 
+  std::string body;
   code = handler(body, *storage_, req);
   if (HTTPCode::OK != code) {
-    sendResponse(sock, code, body);
+    sendResponse(sock, code);
     return ;
   }
 
-  sendResponse(sock, code, body);
+  if (Type::POST == req.type_) {
+    sendResponse(sock, HTTPCode::OK);
+  } else {
+    sendResponse(sock, body);
+  }
 }
 
 HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
@@ -292,17 +325,38 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
   return code;
 }
 
-void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code, const std::string& body)
+void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code)
 {
-  size_t estimatedSize = RESPONSE_HEADER_ESTIMATED_SIZE + body.size() + 1;
-  char* response = new char[estimatedSize];
-  int size = snprintf(response, estimatedSize, RESPONSE_HEADER_FORMAT "%s",
-    code, httpCodeToStr(code), body.size(), body.c_str());
-  response[size] = '\0';
-  ++ size;
+  switch (code) {
+    case HTTPCode::OK:
+      send(sock, RESPONSE_200, RESPONSE_200_SIZE);
+      break;
+    case HTTPCode::BAD_REQ:
+      send(sock, RESPONSE_400, RESPONSE_400_SIZE);
+      break;
+    case HTTPCode::NOT_FOUND:
+      send(sock, RESPONSE_404, RESPONSE_404_SIZE);
+      break;
+  }
+}
 
-  send(sock, response, size);
-  delete[] response;
+void HttpServer::sendResponse(tcp::Socket& sock, const std::string& body)
+{
+  {
+    int one = 1;
+    sock.setsockopt(IPPROTO_TCP, TCP_CORK, &one, sizeof(one));
+  }
+
+  send(sock, RESPONSE_200_PART1, RESPONSE_200_PART1_SIZE);
+  char buffer[32];
+  int size = snprintf(buffer, sizeof(buffer), RESPONSE_200_PART2, body.size());
+  send(sock, buffer, size);
+  send(sock, body.c_str(), body.size());
+
+  {
+    int zero = 0;
+    sock.setsockopt(IPPROTO_TCP, TCP_CORK, &zero, sizeof(zero));
+  }
 }
 
 void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
@@ -311,14 +365,6 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
     return ;
   }
 
-  {
-    int one = 1;
-    sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-  }
-  {
-    int one = 1;
-    sock.setsockopt(IPPROTO_TCP, TCP_CORK, &one, sizeof(one));
-  }
   int offset = 0;
   while (offset < size) {
     int sent = sock.send(buffer + offset, size - offset);
@@ -327,14 +373,15 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
     }
     offset += sent;
   }
-  {
-    int zero = 0;
-    sock.setsockopt(IPPROTO_TCP, TCP_CORK, &zero, sizeof(zero));
-  }
 }
 
 void HttpServer::acceptSocket(tcp::Socket&& sock)
 {
+  {
+    int one = 1;
+    sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+  }
+
   std::thread{&HttpServer::handleRequest, this, std::move(sock)}.detach();
 }
 

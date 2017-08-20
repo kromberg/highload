@@ -21,7 +21,8 @@ private:
   HTTPCode parseHeader(Request& req, bool& hasNext, char* header, int32_t size);
   HTTPCode readRequest(Request& req, tcp::Socket& sock);
 
-  void sendResponse(tcp::Socket& sock, const HTTPCode code, const std::string& body);
+  void sendResponse(tcp::Socket& sock, const HTTPCode code);
+  void sendResponse(tcp::Socket& sock, const std::string& body);
   void send(tcp::Socket& sock, const char* buffer, int32_t size);
 
 public:
