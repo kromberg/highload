@@ -29,18 +29,17 @@ enum HTTPCode
   NOT_FOUND = 404,
 };
 
-inline const char* httpCodeToStr(const HTTPCode code)
+struct Response
 {
-  switch (code) {
-    case HTTPCode::OK:
-      return "OK";
-    case HTTPCode::BAD_REQ:
-      return "Bad Request";
-    case HTTPCode::NOT_FOUND:
-      return "Not Found";
+  std::string* body;
+  bool cached = false;
+  ~Response()
+  {
+    if (!cached) {
+      delete body;
+    }
   }
-  return "Unknown Error";
-}
+};
 
 struct Request
 {

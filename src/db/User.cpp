@@ -100,20 +100,22 @@ bool User::update(const rapidjson::Value& jsonVal)
 
   return true;
 }
-std::string User::getJson(int32_t id) const
+std::string* User::getJson(int32_t id)
 {
-  std::string str;
-  str.reserve(512);
-  str.clear();
-  str += "{";
-  str += "\"id\":" + std::to_string(id) + ",";
-  str += "\"email\":\"" + email + "\",";
-  str += "\"first_name\":\"" + first_name + "\",";
-  str += "\"last_name\":\"" + last_name + "\",";
-  str += "\"birth_date\":" + std::to_string(birth_date) + ",";
-  str += "\"gender\":\"" + std::string(1, gender) + "\"";
-  str += "}";
-  return str;
+  if (!cache_.empty()) {
+    return &cache_;
+  }
+  cache_.reserve(512);
+  cache_.clear();
+  cache_ += "{";
+  cache_ += "\"id\":" + std::to_string(id) + ",";
+  cache_ += "\"email\":\"" + email + "\",";
+  cache_ += "\"first_name\":\"" + first_name + "\",";
+  cache_ += "\"last_name\":\"" + last_name + "\",";
+  cache_ += "\"birth_date\":" + std::to_string(birth_date) + ",";
+  cache_ += "\"gender\":\"" + std::string(1, gender) + "\"";
+  cache_ += "}";
+  return &cache_;
 }
 
 Result User::getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const

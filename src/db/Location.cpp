@@ -86,19 +86,21 @@ bool Location::update(const rapidjson::Value& jsonVal)
   return true;
 }
 
-std::string Location::getJson(int32_t id) const
+std::string* Location::getJson(int32_t id)
 {
-  std::string str;
-  str.reserve(512);
-  str.clear();
-  str += "{";
-  str += "\"id\":" + std::to_string(id) + ",";
-  str += "\"place\":\"" + place + "\",";
-  str += "\"country\":\"" + country + "\",";
-  str += "\"city\":\"" + city + "\",";
-  str += "\"distance\":" + std::to_string(distance);
-  str += "}";
-  return str;
+  if (!cache_.empty()) {
+    return &cache_;
+  }
+  cache_.reserve(512);
+  cache_.clear();
+  cache_ += "{";
+  cache_ += "\"id\":" + std::to_string(id) + ",";
+  cache_ += "\"place\":\"" + place + "\",";
+  cache_ += "\"country\":\"" + country + "\",";
+  cache_ += "\"city\":\"" + city + "\",";
+  cache_ += "\"distance\":" + std::to_string(distance);
+  cache_ += "}";
+  return &cache_;
 }
 
 static std::string to_string(const double val)

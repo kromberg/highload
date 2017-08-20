@@ -27,6 +27,8 @@ struct User
   int32_t birth_date;
   char gender;
 
+  std::string cache_;
+
   std::unordered_map<int32_t, Visit*> visits_;
 
   User(
@@ -39,7 +41,7 @@ struct User
   User(const User& user);
   User& operator=(User&& user);
   bool update(const rapidjson::Value& jsonVal);
-  std::string getJson(int32_t id) const;
+  std::string* getJson(int32_t id);
   Result getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const;
   void dump() const;
 };

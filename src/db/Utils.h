@@ -63,7 +63,14 @@ inline void uriDecode(std::string& res, char* str, int32_t size)
         ++ resSize;
         continue;
       }
+    } else if (*pSrc == '+') {
+      *pEnd = ' ';
+      ++ pEnd;
+      ++ pSrc;
+      ++ resSize;
+      continue;
     }
+
 
     *pEnd++ = *pSrc++;
     ++ resSize;

@@ -559,36 +559,36 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
   return Result::SUCCESS;
 }
 
-Result Storage::getUser(std::string& resp, const int32_t id)
+Result Storage::getUser(std::string*& resp, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
   if (users_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = std::move(it->second.getJson(id));
+  resp = it->second.getJson(id);
   return Result::SUCCESS;
 }
 
-Result Storage::getLocation(std::string& resp, const int32_t id)
+Result Storage::getLocation(std::string*& resp, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);
   if (locations_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = std::move(it->second.getJson(id));
+  resp = it->second.getJson(id);
   return Result::SUCCESS;
 }
 
-Result Storage::getVisit(std::string& resp, const int32_t id)
+Result Storage::getVisit(std::string*& resp, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, false);
   auto it = visits_.find(id);
   if (visits_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = std::move(it->second.getJson(id));
+  resp = it->second.getJson(id);
   return Result::SUCCESS;
 }
 

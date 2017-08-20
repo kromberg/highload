@@ -228,8 +228,8 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
     return ;
   }
 
-  std::string body;
-  code = handler(body, *storage_, req);
+  Response resp;
+  code = handler(resp, *storage_, req);
   if (HTTPCode::OK != code) {
     sendResponse(sock, code);
     return ;
@@ -238,7 +238,7 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
   if (Type::POST == req.type_) {
     sendResponse(sock, HTTPCode::OK);
   } else {
-    sendResponse(sock, body);
+    sendResponse(sock, *resp.body);
   }
 }
 
