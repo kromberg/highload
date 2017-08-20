@@ -87,4 +87,9 @@ int Socket::recv(char* buffer, size_t size, int flags)
 {
   return ::recv(sock_, buffer, size, flags);
 }
+
+int Socket::setsockopt(int level, int optname, const void *optval, socklen_t optlen)
+{
+  return ::setsockopt(sock_, level, optname, optval, optlen);
+}
 } // namespace tcp

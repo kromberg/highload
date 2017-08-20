@@ -512,10 +512,6 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
     }
     locationId = val.GetInt();
 
-    if (382 == locationId) {
-      LOG(stderr, "CHANGING VISIT LOCATION TO 382\n");
-    }
-
     locationsLock.acquire(locationsGuard_, false);
     auto locationIt = locations_.find(locationId);
     if (locations_.end() == locationIt) {

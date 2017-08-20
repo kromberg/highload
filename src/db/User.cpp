@@ -161,6 +161,7 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
   }
   requestParameter.dump();
 
+
   std::multimap<int32_t, Visit*> visits;
   for (const auto& visit : visits_) {
     if (requestParameter.valid(*visit.second)) {

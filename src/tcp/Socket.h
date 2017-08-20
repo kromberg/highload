@@ -2,6 +2,7 @@
 #define _SOCKET_H_
 
 #include <sys/socket.h>
+#include <sys/types.h>
 
 #include <cstdint>
 
@@ -26,6 +27,9 @@ public:
   operator int() { return sock_; }
   int send(const char* buffer, size_t size, int flags = 0);
   int recv(char* buffer, size_t size, int flags = 0);
+
+  int setsockopt(int level, int optname, const void *optval, socklen_t optlen);
+
 };
 } // namespace tcp
 

@@ -3,6 +3,9 @@
 #include <cstring>
 #include <unordered_map>
 
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+
 #include "StateMachine.h"
 #include "HttpServer.h"
 
@@ -298,8 +301,6 @@ void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code, const std:
   response[size] = '\0';
   ++ size;
 
-  //LOG(stderr, "Sending response: %s\n", response);
-
   send(sock, response, size);
   delete[] response;
 }
@@ -310,6 +311,14 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
     return ;
   }
 
+  {
+    int one = 1;
+    sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+  }
+  {
+    int one = 1;
+    sock.setsockopt(IPPROTO_TCP, TCP_CORK, &one, sizeof(one));
+  }
   int offset = 0;
   while (offset < size) {
     int sent = sock.send(buffer + offset, size - offset);
@@ -317,6 +326,10 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
       break ;
     }
     offset += sent;
+  }
+  {
+    int zero = 0;
+    sock.setsockopt(IPPROTO_TCP, TCP_CORK, &zero, sizeof(zero));
   }
 }
 
