@@ -91,7 +91,7 @@ std::string* Location::getJson(int32_t id)
   if (!cache_.empty()) {
     return &cache_;
   }
-  cache_.reserve(512);
+  cache_.reserve(53 + 10 + place.size() + country.size() + city.size() + 10 + 16);
   cache_.clear();
   cache_ += "{";
   cache_ += "\"id\":" + std::to_string(id) + ",";

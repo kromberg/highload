@@ -93,7 +93,7 @@ std::string* Visit::getJson(int32_t id)
   if (!cache_.empty()) {
     return &cache_;
   }
-  cache_.reserve(512);
+  cache_.reserve(49 + 10 + 10 + 10 + 10 + 1 + 16);
   cache_.clear();
   cache_ += "{";
   cache_ += "\"id\":" + std::to_string(id) + ",";

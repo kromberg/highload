@@ -105,7 +105,7 @@ std::string* User::getJson(int32_t id)
   if (!cache_.empty()) {
     return &cache_;
   }
-  cache_.reserve(512);
+  cache_.reserve(75 + 10 + email.size() + first_name.size() + last_name.size() + 10 + 1 + 16);
   cache_.clear();
   cache_ += "{";
   cache_ += "\"id\":" + std::to_string(id) + ",";
