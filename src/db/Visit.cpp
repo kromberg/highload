@@ -37,6 +37,26 @@ Visit::Visit(
   mark = jsonVal["mark"].GetInt();
 }
 
+Visit::Visit(const Visit& visit):
+  location(visit.location),
+  user(visit.user),
+  visited_at(visit.visited_at),
+  mark(visit.mark),
+  location_(visit.location_),
+  user_(visit.user_)
+{}
+
+Visit& Visit::operator=(Visit&& visit)
+{
+  location = std::move(visit.location);
+  user = std::move(visit.user);
+  visited_at = std::move(visit.visited_at);
+  mark = std::move(visit.mark);
+  location_ = std::move(visit.location_);
+  user_ = std::move(visit.user_);
+  return *this;
+}
+
 bool Visit::update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal)
 {
   using namespace rapidjson;

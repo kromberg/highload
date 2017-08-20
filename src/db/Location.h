@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <tbb/spin_rw_mutex.h>
+
 #include <rapidjson/document.h>
 
 #include <common/Types.h>
@@ -17,6 +19,8 @@ using common::Result;
 
 struct Location
 {
+  tbb::spin_rw_mutex guard_;
+
   std::string place;
   std::string country;
   std::string city;
@@ -30,6 +34,8 @@ struct Location
     std::string&& _city,
     const int32_t _distance);
   Location(const rapidjson::Value& jsonVal);
+  Location(const Location& location);
+  Location& operator=(Location&& location);
   bool update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id) const;
   Result getJsonAvgScore(std::string& result, char* params, const int32_t paramsSize) const;

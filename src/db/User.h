@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <tbb/spin_rw_mutex.h>
+
 #include <rapidjson/document.h>
 
 #include <common/Types.h>
@@ -17,6 +19,8 @@ using common::Result;
 
 struct User
 {
+  tbb::spin_rw_mutex guard_;
+
   std::string email;
   std::string first_name;
   std::string last_name;
@@ -32,6 +36,8 @@ struct User
     const int32_t _birth_date,
     const char _gender);
   User(const rapidjson::Value& jsonVal);
+  User(const User& user);
+  User& operator=(User&& user);
   bool update(const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id) const;
   Result getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const;

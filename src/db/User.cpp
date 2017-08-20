@@ -31,6 +31,24 @@ User::User(const rapidjson::Value& jsonVal)
   gender = *jsonVal["gender"].GetString();
 }
 
+User::User(const User& user):
+  email(user.email),
+  first_name(user.first_name),
+  last_name(user.last_name),
+  birth_date(user.birth_date),
+  gender(user.gender)
+{}
+
+User& User::operator=(User&& user)
+{
+  email = std::move(user.email);
+  first_name = std::move(user.first_name);
+  last_name = std::move(user.last_name);
+  birth_date = std::move(user.birth_date);
+  gender = std::move(user.gender);
+  return *this;
+}
+
 bool User::update(const rapidjson::Value& jsonVal)
 {
   using namespace rapidjson;

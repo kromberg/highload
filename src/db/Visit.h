@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <string>
 
+#include <tbb/spin_rw_mutex.h>
+
 #include <rapidjson/document.h>
 
 namespace db
@@ -12,6 +14,8 @@ struct User;
 struct Location;
 struct Visit
 {
+  tbb::spin_rw_mutex guard_;
+
   int32_t location;
   int32_t user;
   int32_t visited_at;
@@ -34,6 +38,8 @@ struct Visit
     Location* _location,
     User* _user,
     const rapidjson::Value& jsonVal);
+  Visit(const Visit& visit);
+  Visit& operator=(Visit&& visit);
   bool update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
   void dump() const;

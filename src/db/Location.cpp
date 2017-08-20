@@ -30,6 +30,22 @@ Location::Location(const rapidjson::Value& jsonVal)
   distance = jsonVal["distance"].GetInt();
 }
 
+Location::Location(const Location& location):
+  place(location.place),
+  country(location.country),
+  city(location.city),
+  distance(location.distance)
+{}
+
+Location& Location::operator=(Location&& location)
+{
+  place = std::move(location.place);
+  country = std::move(location.country);
+  city = std::move(location.city);
+  distance = std::move(location.distance);
+  return *this;
+}
+
 bool Location::update(const rapidjson::Value& jsonVal)
 {
   using namespace rapidjson;

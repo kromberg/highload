@@ -412,14 +412,16 @@ Result Storage::addVisit(const rapidjson::Value& jsonVal)
     mark = val.GetInt();
   }
 
-  tbb::spin_rw_mutex::scoped_lock usersLock(usersGuard_, false);
+  tbb::spin_rw_mutex::scoped_lock usersLock(usersGuard_, true);
   auto userIt = users_.find(userId);
   if (users_.end() == userIt) {
     return Result::NOT_FOUND;
   }
   User* user = &userIt->second;
+  tbb::spin_rw_mutex::scoped_lock userLock(user->guard_, true);
+  usersLock.release();
 
-  tbb::spin_rw_mutex::scoped_lock locationsLock(locationsGuard_, false);
+  tbb::spin_rw_mutex::scoped_lock locationsLock(locationsGuard_, true);
   auto locationIt = locations_.find(locationId);
   if (locations_.end() == locationIt) {
     return Result::NOT_FOUND;
@@ -428,9 +430,9 @@ Result Storage::addVisit(const rapidjson::Value& jsonVal)
     LOG(stderr, "ADDING VISIT TO 382\n");
   }
   Location* location = &locationIt->second;
+  tbb::spin_rw_mutex::scoped_lock locationLock(location->guard_, true);
+  locationsLock.release();
 
-  usersLock.upgrade_to_writer();
-  locationsLock.upgrade_to_writer();
   tbb::spin_rw_mutex::scoped_lock visitsLock(visitsGuard_, true);
   auto res = visits_.emplace(
     std::piecewise_construct,
@@ -458,7 +460,8 @@ Result Storage::updateUser(const int32_t id, const rapidjson::Value& jsonVal)
   if (users_.end() == it) {
     return Result::NOT_FOUND;
   }
-  l.upgrade_to_writer();
+  tbb::spin_rw_mutex::scoped_lock userLock(it->second.guard_, true);
+  l.release();
   if (!it->second.update(jsonVal)) {
     return Result::FAILED;
   }
@@ -485,7 +488,7 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
 {
   using namespace rapidjson;
 
-  tbb::spin_rw_mutex::scoped_lock usersLock;
+  tbb::spin_rw_mutex::scoped_lock userLock;
   int32_t userId = -1;
   User *user = nullptr;
   if (jsonVal.HasMember("user")) {
@@ -494,15 +497,16 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
       return Result::FAILED;
     }
     userId = val.GetInt();
-    usersLock.acquire(usersGuard_, false);
+    tbb::spin_rw_mutex::scoped_lock usersLock(usersGuard_, true);
     auto userIt = users_.find(userId);
     if (users_.end() == userIt) {
       return Result::NOT_FOUND;
     }
     user = &userIt->second;
+    userLock.acquire(user->guard_, true);
   }
 
-  tbb::spin_rw_mutex::scoped_lock locationsLock;
+  tbb::spin_rw_mutex::scoped_lock locationLock;
   int32_t locationId = -1;
   Location *location = nullptr;
   if (jsonVal.HasMember("location")) {
@@ -512,26 +516,22 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
     }
     locationId = val.GetInt();
 
-    locationsLock.acquire(locationsGuard_, false);
+    tbb::spin_rw_mutex::scoped_lock locationsLock(locationsGuard_, true);
     auto locationIt = locations_.find(locationId);
     if (locations_.end() == locationIt) {
       return Result::NOT_FOUND;
     }
     location = &locationIt->second;
+    locationLock.acquire(location->guard_, true);
   }
 
-  if (user) {
-    usersLock.upgrade_to_writer();
-  }
-  if (location) {
-    locationsLock.upgrade_to_writer();
-  }
-  tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, false);
+  tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, true);
   auto it = visits_.find(id);
   if (visits_.end() == it) {
     return Result::NOT_FOUND;
   }
-  l.upgrade_to_writer();
+  tbb::spin_rw_mutex::scoped_lock visitLock(it->second.guard_, true);
+  l.release();
   if (!it->second.update(locationId, userId, jsonVal)) {
     return Result::FAILED;
   }
