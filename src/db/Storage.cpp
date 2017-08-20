@@ -113,7 +113,7 @@ Result Storage::load(const std::string& path)
       location->visits_.emplace(
         std::piecewise_construct,
         std::forward_as_tuple(id),
-        std::forward_as_tuple(user, visit));
+        std::forward_as_tuple(visit));
     });
 
   return Result::SUCCESS;
@@ -424,6 +424,9 @@ Result Storage::addVisit(const rapidjson::Value& jsonVal)
   if (locations_.end() == locationIt) {
     return Result::NOT_FOUND;
   }
+  if (382 == locationId) {
+    LOG(stderr, "ADDING VISIT TO 382\n");
+  }
   Location* location = &locationIt->second;
 
   usersLock.upgrade_to_writer();
@@ -443,7 +446,7 @@ Result Storage::addVisit(const rapidjson::Value& jsonVal)
   location->visits_.emplace(
     std::piecewise_construct,
     std::forward_as_tuple(id),
-    std::forward_as_tuple(user, visit));
+    std::forward_as_tuple(visit));
 
   return Result::SUCCESS;
 }
@@ -509,6 +512,10 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
     }
     locationId = val.GetInt();
 
+    if (382 == locationId) {
+      LOG(stderr, "CHANGING VISIT LOCATION TO 382\n");
+    }
+
     locationsLock.acquire(locationsGuard_, false);
     auto locationIt = locations_.find(locationId);
     if (locations_.end() == locationIt) {
@@ -528,31 +535,29 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
   if (visits_.end() == it) {
     return Result::NOT_FOUND;
   }
-  const int32_t prevLocation = it->second.location;
-  const int32_t prevUser = it->second.user;
   l.upgrade_to_writer();
   if (!it->second.update(locationId, userId, jsonVal)) {
     return Result::FAILED;
   }
 
-  if (user && prevUser != userId) {
+  bool userChanged = false;
+  if (user && it->second.user_ != user) {
+    userChanged = true;
+    it->second.user_->visits_.erase(id);
     it->second.user_ = user;
-    user->visits_.emplace(
+    it->second.user_->visits_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(id),
       std::forward_as_tuple(&it->second));
-    auto oldUserIt = users_.find(prevUser);
-    oldUserIt->second.visits_.erase(id);
   }
 
-  if (location && prevLocation != locationId) {
+  if (location && it->second.location_ != location) {
+    it->second.location_->visits_.erase(id);
     it->second.location_ = location;
-    location->visits_.emplace(
+    it->second.location_->visits_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(id),
-      std::forward_as_tuple(it->second.user_, &it->second));
-    auto oldLocationIt = locations_.find(prevLocation);
-    oldLocationIt->second.visits_.erase(id);
+      std::forward_as_tuple(&it->second));
   }
 
   return Result::SUCCESS;

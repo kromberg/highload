@@ -70,7 +70,7 @@ bool Location::update(const rapidjson::Value& jsonVal)
   return true;
 }
 
-std::string Location::getJson(int32_t id)
+std::string Location::getJson(int32_t id) const
 {
   std::string str;
   str.reserve(512);
@@ -92,18 +92,18 @@ static std::string to_string(const double val)
   return ss.str();
 }
 
-Result Location::getJsonAvgScore(std::string& result, char* params, const int32_t paramsSize)
+Result Location::getJsonAvgScore(std::string& result, char* params, const int32_t paramsSize) const
 {
   struct Parameters
   {
     std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
     std::pair<int32_t, int32_t> birth_date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
     char gender = 0;
-    bool valid(const std::pair<User*, Visit*>& visit) const
+    bool valid(const Visit& visit) const
     {
-      return (visit.second->visited_at > date.first && visit.second->visited_at < date.second &&
-              visit.first->birth_date > birth_date.first && visit.first->birth_date < birth_date.second &&
-              (!gender || visit.first->gender == gender));
+      return (visit.visited_at > date.first && visit.visited_at < date.second &&
+              visit.user_->birth_date > birth_date.first && visit.user_->birth_date < birth_date.second &&
+              (!gender || visit.user_->gender == gender));
     }
     void dump() const
     {
@@ -145,16 +145,14 @@ Result Location::getJsonAvgScore(std::string& result, char* params, const int32_
         struct tm fromTime = Storage::getTime();
         fromTime.tm_year -= fromAge;
         requestParameter.birth_date.second = static_cast<int32_t>(timegm(&fromTime));
-        LOG(stderr, "fromAge = %d\n", fromAge);
-        LOG(stderr, "fromTime = %s\n", asctime(&fromTime));
+        LOG(stderr, "to birth_date = %s\n", asctime(&fromTime));
       } else if (0 == strncmp(param, "toAge", val - param)) {
         int32_t toAge;
         PARSE_INT32(toAge, val + 1, paramEnd);
         struct tm toTime = Storage::getTime();
         toTime.tm_year -= toAge;
         requestParameter.birth_date.first = static_cast<int32_t>(timegm(&toTime));
-        LOG(stderr, "toAge = %d\n", toAge);
-        LOG(stderr, "toTime = %s\n", asctime(&toTime));
+        LOG(stderr, "from birth_date = %s\n", asctime(&toTime));
       } else {
         return Result::FAILED;
       }
@@ -171,9 +169,9 @@ Result Location::getJsonAvgScore(std::string& result, char* params, const int32_
   uint64_t count = 0;
 
   for (const auto& visit : visits_) {
-    if (requestParameter.valid(visit.second)) {
+    if (requestParameter.valid(*visit.second)) {
       ++ count;
-      sum += visit.second.second->mark;
+      sum += visit.second->mark;
     }
   }
 
@@ -189,5 +187,9 @@ Result Location::getJsonAvgScore(std::string& result, char* params, const int32_
   result += "}";
   return Result::SUCCESS;
 }
-
+void Location::dump() const
+{
+  LOG(stderr, "place = %s; country = %s; city = %s; distance = %d\n",
+    place.c_str(), country.c_str(), city.c_str(), distance);
+}
 } // namespace db

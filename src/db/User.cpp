@@ -82,7 +82,7 @@ bool User::update(const rapidjson::Value& jsonVal)
 
   return true;
 }
-std::string User::getJson(int32_t id)
+std::string User::getJson(int32_t id) const
 {
   std::string str;
   str.reserve(512);
@@ -98,7 +98,7 @@ std::string User::getJson(int32_t id)
   return str;
 }
 
-Result User::getJsonVisits(std::string& result, char* params, const int32_t paramsSize)
+Result User::getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const
 {
   struct Parameters
   {
@@ -161,7 +161,7 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
   }
   requestParameter.dump();
 
-  std::map<int32_t, Visit*> visits;
+  std::multimap<int32_t, Visit*> visits;
   for (const auto& visit : visits_) {
     if (requestParameter.valid(*visit.second)) {
       visits.emplace(
@@ -188,5 +188,11 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
   result += "]";
   result += "}";
   return Result::SUCCESS;
+}
+
+void User::dump() const
+{
+  LOG(stderr, "email = %s; first_name = %s; last_name = %s; birth_date = %d; gender = %c\n",
+    email.c_str(), first_name.c_str(), last_name.c_str(), birth_date, gender);
 }
 } // namespace db

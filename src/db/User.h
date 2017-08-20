@@ -33,8 +33,9 @@ struct User
     const char _gender);
   User(const rapidjson::Value& jsonVal);
   bool update(const rapidjson::Value& jsonVal);
-  std::string getJson(int32_t id);
-  Result getJsonVisits(std::string& result, char* params, const int32_t paramsSize);
+  std::string getJson(int32_t id) const;
+  Result getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const;
+  void dump() const;
 };
 } // namespace db
 #endif // _DB_USER_H_

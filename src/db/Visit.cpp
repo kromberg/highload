@@ -2,6 +2,7 @@
 
 #include "Visit.h"
 #include "Location.h"
+#include "User.h"
 
 namespace db
 {
@@ -84,7 +85,9 @@ std::string Visit::getJson(int32_t id)
 
 void Visit::dump() const
 {
-  LOG(stderr, "id = %d; location = %d, user = %d, visited_at = %d, mark = %d\n",
-    id, location, user, visited_at, mark);
+  LOG(stderr, "location = %d, user = %d, visited_at = %d, mark = %d\n",
+    location, user, visited_at, mark);
+  user_->dump();
+  location_->dump();
 }
 } // namespace db
