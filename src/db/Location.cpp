@@ -7,6 +7,7 @@
 
 #include "Utils.h"
 #include "Location.h"
+#include "Storage.h"
 
 namespace db
 {
@@ -93,8 +94,6 @@ static std::string to_string(const double val)
 
 Result Location::getJsonAvgScore(std::string& result, char* params, const int32_t paramsSize)
 {
-  static time_t currentTimeT = time(nullptr);
-  static struct tm currentTime = *gmtime(&currentTimeT);
   struct Parameters
   {
     std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
@@ -143,20 +142,18 @@ Result Location::getJsonAvgScore(std::string& result, char* params, const int32_
       } else if (0 == strncmp(param, "fromAge", val - param)) {
         int32_t fromAge;
         PARSE_INT32(fromAge, val + 1, paramEnd);
-        struct tm fromTime = currentTime;
+        struct tm fromTime = Storage::getTime();
         fromTime.tm_year -= fromAge;
         requestParameter.birth_date.second = static_cast<int32_t>(timegm(&fromTime));
         LOG(stderr, "fromAge = %d\n", fromAge);
-        LOG(stderr, "currentTime = %s\n", asctime(&currentTime));
         LOG(stderr, "fromTime = %s\n", asctime(&fromTime));
       } else if (0 == strncmp(param, "toAge", val - param)) {
         int32_t toAge;
         PARSE_INT32(toAge, val + 1, paramEnd);
-        struct tm toTime = currentTime;
+        struct tm toTime = Storage::getTime();
         toTime.tm_year -= toAge;
         requestParameter.birth_date.first = static_cast<int32_t>(timegm(&toTime));
         LOG(stderr, "toAge = %d\n", toAge);
-        LOG(stderr, "currentTime = %s\n", asctime(&currentTime));
         LOG(stderr, "toTime = %s\n", asctime(&toTime));
       } else {
         return Result::FAILED;

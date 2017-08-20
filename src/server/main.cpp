@@ -26,6 +26,7 @@ int main(int argc, char* argv[])
 
   db::StoragePtr storage(new db::Storage);
   storage->load("/tmp/data/data.zip");
+  db::Storage::loadTime("/tmp/data/options.txt");
 
   http::HttpServer server(storage);
   Result res = server.start();

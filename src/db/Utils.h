@@ -13,7 +13,7 @@ namespace db
   }\
 }
 
-inline void uriDecode(char*& res, int32_t& resSize, char* str, int32_t size)
+inline void uriDecode(std::string& res, char* str, int32_t size)
 {
    // Note from RFC1630: "Sequences which start with a percent
    // sign but are not followed by two hexadecimal characters
@@ -46,9 +46,9 @@ inline void uriDecode(char*& res, int32_t& resSize, char* str, int32_t size)
    // last decodable '%' 
   const unsigned char * const SRC_LAST_DEC = SRC_END - 2;
 
-  res = new char[size];
-  resSize = 0;
-  char * pEnd = res;
+  res.resize(size);
+  size_t resSize = 0;
+  char * pEnd = &res[0];
 
   while (pSrc < SRC_LAST_DEC)
   {
@@ -72,7 +72,10 @@ inline void uriDecode(char*& res, int32_t& resSize, char* str, int32_t size)
      // the last 2- chars
   while (pSrc < SRC_END) {
     *pEnd++ = *pSrc++;
+    ++ resSize;
   }
+
+  res.resize(resSize);
 }
 
 } // namespace db

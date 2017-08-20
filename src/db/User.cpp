@@ -103,17 +103,12 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
   struct Parameters
   {
     std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
-    char* country = nullptr;
-    int32_t countrySize = 0;
+    std::string country;
     int32_t toDistance = std::numeric_limits<int32_t>::max();
-    ~Parameters()
-    {
-      delete[] country;
-    }
     bool valid(const Visit& visit) const
     {
       return ((visit.visited_at > date.first) && (visit.visited_at < date.second) &&
-              ((0 == countrySize) || (0 == visit.location_->country.compare(0, std::string::npos, country, countrySize))) &&
+              (country.empty() || (country == visit.location_->country)) &&
               (visit.location_->distance < toDistance));
     }
     void dump() const
@@ -145,7 +140,7 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
       } else if (0 == strncmp(param, "toDate", val - param)) {
         PARSE_INT32(requestParameter.date.second, val + 1, paramEnd);
       } else if (0 == strncmp(param, "country", val - param)) {
-        uriDecode(requestParameter.country, requestParameter.countrySize, val + 1, strlen(val + 1));
+        uriDecode(requestParameter.country, val + 1, strlen(val + 1));
       } else if (0 == strncmp(param, "toDistance", val - param)) {
         PARSE_INT32(requestParameter.toDistance, val + 1, paramEnd);
       } else {

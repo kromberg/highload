@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 #include <list>
+#include <ctime>
+#include <time.h>
 
 #include <tbb/spin_rw_mutex.h>
 
@@ -31,6 +33,8 @@ private:
   std::unordered_map<int32_t, Visit> visits_;
   tbb::spin_rw_mutex visitsGuard_;
 
+  static struct tm time_;
+
   typedef std::list<struct zip_stat> ZipStats;
   typedef std::function<void(const rapidjson::Value&)> MapLoaderFunc;
 
@@ -43,6 +47,8 @@ private:
     const MapLoaderFunc& func);
 public:
   Result load(const std::string& path);
+  static Result loadTime(const std::string& path);
+  static struct tm getTime();
 
   Result addUser(const rapidjson::Value& jsonVal);
   Result updateUser(const int32_t id, const rapidjson::Value& jsonVal);

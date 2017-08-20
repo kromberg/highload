@@ -1,5 +1,6 @@
 #include <cstring>
 #include <unordered_set>
+#include <fstream>
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -12,6 +13,8 @@
 
 namespace db
 {
+
+struct tm Storage::time_;
 
 Result Storage::load(const std::string& path)
 {
@@ -170,6 +173,21 @@ void Storage::loadFiles(
       delete[] buf;
     }
   }
+}
+
+Result Storage::loadTime(const std::string& path)
+{
+  std::ifstream fin(path.c_str());
+  time_t currentTime;
+  fin >> currentTime;
+  LOG(stderr, "Timestame loaded from file: %d\n", static_cast<int32_t>(currentTime));
+  time_ = *gmtime(&currentTime);
+  return Result::SUCCESS;
+}
+
+struct tm Storage::getTime()
+{
+  return time_;
 }
 
 Result Storage::addUser(const rapidjson::Value& jsonVal)
@@ -519,12 +537,22 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
 
   if (user && prevUser != userId) {
     it->second.user_ = user;
-    user->visits_[id] = &it->second;
+    user->visits_.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(id),
+      std::forward_as_tuple(&it->second));
+    auto oldUserIt = users_.find(prevUser);
+    oldUserIt->second.visits_.erase(id);
   }
 
   if (location && prevLocation != locationId) {
     it->second.location_ = location;
-    location->visits_[id] = std::make_pair(it->second.user_, &it->second);
+    location->visits_.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(id),
+      std::forward_as_tuple(it->second.user_, &it->second));
+    auto oldLocationIt = locations_.find(prevLocation);
+    oldLocationIt->second.visits_.erase(id);
   }
 
   return Result::SUCCESS;
