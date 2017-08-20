@@ -81,4 +81,10 @@ std::string Visit::getJson(int32_t id)
   str += "}";
   return str;
 }
+
+void Visit::dump() const
+{
+  LOG(stderr, "id = %d; location = %d, user = %d, visited_at = %d, mark = %d\n",
+    id, location, user, visited_at, mark);
+}
 } // namespace db

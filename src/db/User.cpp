@@ -107,14 +107,21 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
     int32_t toDistance = std::numeric_limits<int32_t>::max();
     bool valid(const Visit& visit) const
     {
-      return ((visit.visited_at > date.first) && (visit.visited_at < date.second) &&
+      bool res = ((visit.visited_at > date.first) && (visit.visited_at < date.second) &&
               (country.empty() || (country == visit.location_->country)) &&
               (visit.location_->distance < toDistance));
+      LOG(stderr, "\n");
+      visit.dump();
+      dump();
+      LOG(stderr, "%s\n", res ? "PASSED" : "FAILED");
+      LOG(stderr, "\n");
+      
+      return res;
     }
     void dump() const
     {
       LOG(stderr, "date.first = %d\ndate.second = %d\ncountry = %s\ndistance = %d\n",
-        date.first, date.second, country ? country : "null", toDistance);
+        date.first, date.second, country.c_str(), toDistance);
     }
   } requestParameter;
   if (params) {

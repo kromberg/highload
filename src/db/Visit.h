@@ -36,6 +36,7 @@ struct Visit
     const rapidjson::Value& jsonVal);
   bool update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal);
   std::string getJson(int32_t id);
+  void dump() const;
 };
 } // namespace db
 #endif // _DB_VISIT_H_
