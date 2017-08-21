@@ -6,11 +6,15 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include <common/Profiler.h>
+
 #include "StateMachine.h"
 #include "HttpServer.h"
 
 namespace http
 {
+
+using common::TimeProfiler;
 
 static const char* RESPONSE_200 = 
   "HTTP/1.1 200 OK\n"
@@ -40,11 +44,11 @@ static const char* RESPONSE_404 =
   "{}";
 #define RESPONSE_404_SIZE 108
 
-static const char* RESPONSE_200_PART1 = 
-  "HTTP/1.1 200 OK\n"
-  "Content-Type: application/json; charset=UTF-8\n"
-  "Connection: close\n"
-  "Content-Length: ";
+#define RESPONSE_200_PART1 \
+  "HTTP/1.1 200 OK\n"\
+  "Content-Type: application/json; charset=UTF-8\n"\
+  "Connection: close\n"\
+  "Content-Length: "
 #define RESPONSE_200_PART1_SIZE 96
 
 #define RESPONSE_200_PART2 \
@@ -174,7 +178,9 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, char* reqMethod, int32_t s
     return HTTPCode::BAD_REQ;
   }
   *next = '\0';
+  //TimeProfiler tp("url parsing");
   HTTPCode code = parseURL(req, reqMethod, next - reqMethod);
+  //tp.stop();
   if (HTTPCode::OK != code) {
     //LOG(stderr, "Parsing URL error code = %d\n", code);
     return code;
@@ -276,8 +282,9 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         switch (state) {
           case State::METHOD:
           {
-            //LOG(stderr, "Method : %s\n", buffer + offset);
+            //TimeProfiler tp("req method parsing");
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
+            //tp.stop();
             if (HTTPCode::OK != code) {
               LOG(stderr, "Method : %s. Code : %d\n\n", buffer + offset, code);
               return code;
@@ -289,7 +296,9 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
           {
             //LOG(stderr, "Header : %s\n", buffer + offset);
             bool hasNext;
+            //TimeProfiler tp("header parsing");
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
+            //tp.stop();
             if (HTTPCode::OK != code) {
               LOG(stderr, "Header : %s. Code : %d\n\n", buffer + offset, code);
               return code;
@@ -319,7 +328,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         next = strchr(buffer + offset, '\n');
       }
     }
-  } while (res >= 0);
+  } while (res > 0);
   return code;
 }
 
@@ -340,21 +349,9 @@ void HttpServer::sendResponse(tcp::Socket& sock, const HTTPCode code)
 
 void HttpServer::sendResponse(tcp::Socket& sock, const std::string& body)
 {
-  {
-    int one = 1;
-    sock.setsockopt(IPPROTO_TCP, TCP_CORK, &one, sizeof(one));
-  }
-
-  send(sock, RESPONSE_200_PART1, RESPONSE_200_PART1_SIZE);
-  char buffer[32];
-  int size = snprintf(buffer, sizeof(buffer), RESPONSE_200_PART2, body.size());
+  char buffer[8 * 1024];
+  int size = snprintf(buffer, sizeof(buffer), RESPONSE_200_PART1 RESPONSE_200_PART2 "%s", body.size(), body.c_str());
   send(sock, buffer, size);
-  send(sock, body.c_str(), body.size());
-
-  {
-    int zero = 0;
-    sock.setsockopt(IPPROTO_TCP, TCP_CORK, &zero, sizeof(zero));
-  }
 }
 
 void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
@@ -364,7 +361,6 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
   }
 
   LOG(stderr, "Sending buffer: %s\n", buffer);
-
 
   int offset = 0;
   while (offset < size) {
@@ -382,7 +378,12 @@ void HttpServer::acceptSocket(tcp::Socket&& sock)
     int one = 1;
     sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
   }
+  {
+    int one = 1;
+    sock.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
+  }
 
+  //TimeProfiler tp("thread creation");
   std::thread{&HttpServer::handleRequest, this, std::move(sock)}.detach();
 }
 

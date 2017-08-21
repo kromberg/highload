@@ -3,10 +3,14 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+#include <common/Profiler.h>
+
 #include "Socket.h"
 
 namespace tcp
 {
+using common::TimeProfiler;
+
 Socket::Socket(int sock):
   sock_(sock)
 {}
@@ -80,11 +84,13 @@ int Socket::close()
 
 int Socket::send(const char* buffer, size_t size, int flags)
 {
+  //TimeProfiler tp("send");
   return ::send(sock_, buffer, size, flags);
 }
 
 int Socket::recv(char* buffer, size_t size, int flags)
 {
+  //TimeProfiler tp("recv");
   return ::recv(sock_, buffer, size, flags);
 }
 

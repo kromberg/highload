@@ -17,4 +17,6 @@ enum class Result
 # define LOG(...)
 #endif
 
+#define LOG_CRITICAL fprintf
+
 #endif // _TYPES_H_

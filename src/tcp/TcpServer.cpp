@@ -1,5 +1,8 @@
 #include <cstring>
 
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+
 #include "TcpServer.h"
 
 namespace tcp
@@ -46,6 +49,18 @@ Result TcpServer::start(const uint16_t port)
     LOG(stderr, "Cannot bind server socket. errno = %d(%s)\n",
       errno, std::strerror(errno));
     return Result::FAILED;
+  }
+  {
+    int one = 1;
+    sock_.setsockopt(IPPROTO_TCP, TCP_DEFER_ACCEPT, &one, sizeof(one));
+  }
+  {
+    int one = 1;
+    sock_.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+  }
+  {
+    int one = 1;
+    sock_.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
   }
 
   std::thread tmpThread(&TcpServer::acceptFunc, this);

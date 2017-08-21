@@ -54,4 +54,8 @@ ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/root/tbb-2017_U7/build/linux_intel64_gcc
 
 EXPOSE 80
 
-CMD server.out
+#RUN yum install -y graphviz
+#RUN yum install -y ghostscript
+
+CMD CPUPROFILE=/tmp/prof/prof.out server.out
+#CMD server.out

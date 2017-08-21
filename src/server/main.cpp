@@ -11,6 +11,8 @@
 #include <http/HttpServer.h>
 #include <db/Storage.h>
 
+#include <common/Profiler.h>
+
 volatile bool running = false;
 void sig_handler(int signum)
 {
@@ -39,6 +41,8 @@ int main(int argc, char* argv[])
   }
 
   server.stop();
+
+  common::TimeProfiler::print();
 
   return 0;
 }
