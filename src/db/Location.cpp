@@ -22,12 +22,15 @@ Location::Location(
   distance(_distance)
 {}
 
-Location::Location(const rapidjson::Value& jsonVal)
+Location::Location(
+  const int32_t id,
+  const rapidjson::Value& jsonVal)
 {
   place = std::string(jsonVal["place"].GetString());
   country = std::string(jsonVal["country"].GetString());
   city = std::string(jsonVal["city"].GetString());
   distance = jsonVal["distance"].GetInt();
+  cache(id);
 }
 
 Location::Location(const Location& location):
@@ -43,7 +46,21 @@ Location& Location::operator=(Location&& location)
   country = std::move(location.country);
   city = std::move(location.city);
   distance = std::move(location.distance);
+  cache_.clear();
   return *this;
+}
+
+void Location::cache(const int32_t id)
+{
+  cache_.reserve(53 + 10 + place.size() + country.size() + city.size() + 10 + 16);
+  cache_.clear();
+  cache_ += "{";
+  cache_ += "\"id\":" + std::to_string(id) + ",";
+  cache_ += "\"place\":\"" + place + "\",";
+  cache_ += "\"country\":\"" + country + "\",";
+  cache_ += "\"city\":\"" + city + "\",";
+  cache_ += "\"distance\":" + std::to_string(distance);
+  cache_ += "}";
 }
 
 bool Location::update(const rapidjson::Value& jsonVal)
@@ -86,20 +103,12 @@ bool Location::update(const rapidjson::Value& jsonVal)
   return true;
 }
 
-std::string* Location::getJson(int32_t id)
+std::string* Location::getJson(const int32_t id)
 {
   if (!cache_.empty()) {
     return &cache_;
   }
-  cache_.reserve(53 + 10 + place.size() + country.size() + city.size() + 10 + 16);
-  cache_.clear();
-  cache_ += "{";
-  cache_ += "\"id\":" + std::to_string(id) + ",";
-  cache_ += "\"place\":\"" + place + "\",";
-  cache_ += "\"country\":\"" + country + "\",";
-  cache_ += "\"city\":\"" + city + "\",";
-  cache_ += "\"distance\":" + std::to_string(distance);
-  cache_ += "}";
+  cache(id);
   return &cache_;
 }
 

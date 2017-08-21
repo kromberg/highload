@@ -22,13 +22,16 @@ User::User(
   gender(_gender)
 {}
 
-User::User(const rapidjson::Value& jsonVal)
+User::User(
+  const int32_t id,
+  const rapidjson::Value& jsonVal)
 {
   email = std::string(jsonVal["email"].GetString());
   first_name = std::string(jsonVal["first_name"].GetString());
   last_name = std::string(jsonVal["last_name"].GetString());
   birth_date = jsonVal["birth_date"].GetInt();
   gender = *jsonVal["gender"].GetString();
+  cache(id);
 }
 
 User::User(const User& user):
@@ -46,7 +49,22 @@ User& User::operator=(User&& user)
   last_name = std::move(user.last_name);
   birth_date = std::move(user.birth_date);
   gender = std::move(user.gender);
+  cache_.clear();
   return *this;
+}
+
+void User::cache(const int32_t id)
+{
+  cache_.reserve(75 + 10 + email.size() + first_name.size() + last_name.size() + 10 + 1 + 16);
+  cache_.clear();
+  cache_ += "{";
+  cache_ += "\"id\":" + std::to_string(id) + ",";
+  cache_ += "\"email\":\"" + email + "\",";
+  cache_ += "\"first_name\":\"" + first_name + "\",";
+  cache_ += "\"last_name\":\"" + last_name + "\",";
+  cache_ += "\"birth_date\":" + std::to_string(birth_date) + ",";
+  cache_ += "\"gender\":\"" + std::string(1, gender) + "\"";
+  cache_ += "}";
 }
 
 bool User::update(const rapidjson::Value& jsonVal)
@@ -100,21 +118,12 @@ bool User::update(const rapidjson::Value& jsonVal)
 
   return true;
 }
-std::string* User::getJson(int32_t id)
+std::string* User::getJson(const int32_t id)
 {
   if (!cache_.empty()) {
     return &cache_;
   }
-  cache_.reserve(75 + 10 + email.size() + first_name.size() + last_name.size() + 10 + 1 + 16);
-  cache_.clear();
-  cache_ += "{";
-  cache_ += "\"id\":" + std::to_string(id) + ",";
-  cache_ += "\"email\":\"" + email + "\",";
-  cache_ += "\"first_name\":\"" + first_name + "\",";
-  cache_ += "\"last_name\":\"" + last_name + "\",";
-  cache_ += "\"birth_date\":" + std::to_string(birth_date) + ",";
-  cache_ += "\"gender\":\"" + std::string(1, gender) + "\"";
-  cache_ += "}";
+  cache(id);
   return &cache_;
 }
 

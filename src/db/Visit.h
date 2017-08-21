@@ -26,7 +26,6 @@ struct Visit
   Location* location_;
   User* user_;
 
-  Visit(const rapidjson::Value& jsonVal);
   Visit(
     const int32_t locationId,
     const int32_t userId,
@@ -35,6 +34,7 @@ struct Visit
     Location* _location,
     User* _user);
   Visit(
+    const int32_t id,
     const int32_t locationId,
     const int32_t userId,
     Location* _location,
@@ -42,8 +42,9 @@ struct Visit
     const rapidjson::Value& jsonVal);
   Visit(const Visit& visit);
   Visit& operator=(Visit&& visit);
+  void cache(const int32_t id);
   bool update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal);
-  std::string* getJson(int32_t id);
+  std::string* getJson(const int32_t id);
   void dump() const;
 };
 } // namespace db

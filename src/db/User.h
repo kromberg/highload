@@ -37,11 +37,14 @@ struct User
     std::string&& _last_name,
     const int32_t _birth_date,
     const char _gender);
-  User(const rapidjson::Value& jsonVal);
+  User(
+    const int32_t id,
+    const rapidjson::Value& jsonVal);
   User(const User& user);
   User& operator=(User&& user);
+  void cache(const int32_t id);
   bool update(const rapidjson::Value& jsonVal);
-  std::string* getJson(int32_t id);
+  std::string* getJson(const int32_t id);
   Result getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const;
   void dump() const;
 };

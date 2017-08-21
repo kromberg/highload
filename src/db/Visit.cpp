@@ -23,6 +23,7 @@ Visit::Visit(
 }
 
 Visit::Visit(
+  const int32_t id,
   const int32_t locationId,
   const int32_t userId,
   Location* _location,
@@ -35,6 +36,7 @@ Visit::Visit(
 {
   visited_at = jsonVal["visited_at"].GetInt();
   mark = jsonVal["mark"].GetInt();
+  cache(id);
 }
 
 Visit::Visit(const Visit& visit):
@@ -54,7 +56,21 @@ Visit& Visit::operator=(Visit&& visit)
   mark = std::move(visit.mark);
   location_ = std::move(visit.location_);
   user_ = std::move(visit.user_);
+  cache_.clear();
   return *this;
+}
+
+void Visit::cache(const int32_t id)
+{
+  cache_.reserve(49 + 10 + 10 + 10 + 10 + 1 + 16);
+  cache_.clear();
+  cache_ += "{";
+  cache_ += "\"id\":" + std::to_string(id) + ",";
+  cache_ += "\"location\":" + std::to_string(location) + ",";
+  cache_ += "\"user\":" + std::to_string(user) + ",";
+  cache_ += "\"visited_at\":" + std::to_string(visited_at) + ",";
+  cache_ += "\"mark\":" + std::to_string(mark);
+  cache_ += "}";
 }
 
 bool Visit::update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal)
@@ -88,20 +104,12 @@ bool Visit::update(const int32_t locationId, const int32_t userId, const rapidjs
   return true;
 }
 
-std::string* Visit::getJson(int32_t id)
+std::string* Visit::getJson(const int32_t id)
 {
   if (!cache_.empty()) {
     return &cache_;
   }
-  cache_.reserve(49 + 10 + 10 + 10 + 10 + 1 + 16);
-  cache_.clear();
-  cache_ += "{";
-  cache_ += "\"id\":" + std::to_string(id) + ",";
-  cache_ += "\"location\":" + std::to_string(location) + ",";
-  cache_ += "\"user\":" + std::to_string(user) + ",";
-  cache_ += "\"visited_at\":" + std::to_string(visited_at) + ",";
-  cache_ += "\"mark\":" + std::to_string(mark);
-  cache_ += "}";
+  cache(id);
   return &cache_;
 }
 

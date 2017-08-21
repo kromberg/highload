@@ -12,37 +12,38 @@
 namespace http
 {
 
-static const char* RESPONSE_200 = \
-  "HTTP/1.1 200 OK\n"\
-  "Content-Type: application/json; charset=UTF-8\n"\
-  "Connection: close\n"\
-  "Content-Length: 2\n"\
-  "\n"\
+static const char* RESPONSE_200 = 
+  "HTTP/1.1 200 OK\n"
+  "Content-Type: application/json; charset=UTF-8\n"
+  "Connection: close\n"
+  "Content-Length: 2\n"
+  "\n"
   "{}";
 #define RESPONSE_200_SIZE 101
 
-static const char* RESPONSE_400 = \
-  "HTTP/1.1 400 Bad Request\n"\
-  "Content-Type: application/json; charset=UTF-8\n"\
-  "Connection: close\n"\
-  "Content-Length: 2\n"\
-  "\n"\
+static const char* RESPONSE_400 = 
+  "HTTP/1.1 400 Bad Request\n"
+  "Content-Type: application/json; charset=UTF-8\n"
+  "Connection: close\n"
+  "Content-Length: 2\n"
+  "\n"
   "{}";
+
 #define RESPONSE_400_SIZE 110
 
-static const char* RESPONSE_404 = \
-  "HTTP/1.1 404 Not Found\n"\
-  "Content-Type: application/json; charset=UTF-8\n"\
-  "Connection: close\n"\
-  "Content-Length: 2\n"\
-  "\n"\
+static const char* RESPONSE_404 = 
+  "HTTP/1.1 404 Not Found\n"
+  "Content-Type: application/json; charset=UTF-8\n"
+  "Connection: close\n"
+  "Content-Length: 2\n"
+  "\n"
   "{}";
 #define RESPONSE_404_SIZE 108
 
-static const char* RESPONSE_200_PART1 = \
-  "HTTP/1.1 200 OK\n"\
-  "Content-Type: application/json; charset=UTF-8\n"\
-  "Connection: close\n"\
+static const char* RESPONSE_200_PART1 = 
+  "HTTP/1.1 200 OK\n"
+  "Content-Type: application/json; charset=UTF-8\n"
+  "Connection: close\n"
   "Content-Length: ";
 #define RESPONSE_200_PART1_SIZE 96
 
@@ -84,12 +85,10 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
 
   char* next = strchr(url + 1, '?');
   if (next) {
-    LOG(stderr, "next: %c\n", *next);
     *next = '\0';
     req.params_ = next + 1;
     req.paramsSize_ = urlSize - (req.params_ - url);
     urlSize -= (req.paramsSize_ + 1); 
-    LOG(stderr, "PARAMS: %s\n", req.params_);
   }
 
   char* prev = nullptr;
@@ -110,7 +109,7 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
       case State::TABLE1:
       case State::TABLE2:
       {
-        LOG(stderr, "Searching for table: %s\n", prev);
+        //LOG(stderr, "Searching for table: %s\n", prev);
         auto it = strToTableMap.find(std::string(prev, size));
         if (strToTableMap.end() == it) {
           return HTTPCode::BAD_REQ;
@@ -142,10 +141,10 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
         break;
       }
       case State::ERROR:
-        LOG(stderr, "Error state\n");
+        //LOG(stderr, "Error state\n");
         return HTTPCode::BAD_REQ;
     }
-    LOG(stderr, "New state = %d\n", state);
+    //LOG(stderr, "New state = %d\n", state);
 
   } while (next);
 
@@ -162,7 +161,6 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, char* reqMethod, int32_t s
     return HTTPCode::BAD_REQ;
   }
   *next = '\0';
-  //LOG(stderr, "Request method: %s\n", reqMethod);
   if (0 == strncmp(reqMethod, "POST", next - reqMethod)) {
     req.type_ = Type::POST;
   } else if (0 == strncmp(reqMethod, "GET", next - reqMethod)) {
@@ -178,7 +176,7 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, char* reqMethod, int32_t s
   *next = '\0';
   HTTPCode code = parseURL(req, reqMethod, next - reqMethod);
   if (HTTPCode::OK != code) {
-    LOG(stderr, "Parsing URL error code = %d\n", code);
+    //LOG(stderr, "Parsing URL error code = %d\n", code);
     return code;
   }
 
@@ -193,7 +191,7 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
     hasNext = false;
     return HTTPCode::OK;
   }
-  LOG(stderr, "HEADER: %s\n", header);
+  //LOG(stderr, "HEADER: %s\n", header);
   char* val = strchr(header, ':');
   if (!val || (val - header) > size) {
     return HTTPCode::BAD_REQ;
@@ -223,7 +221,6 @@ void HttpServer::handleRequest(tcp::Socket&& sock)
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
-    LOG(stderr, "Cannot find handler");
     sendResponse(sock, code);
     return ;
   }
@@ -260,6 +257,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
     if (res) {
       size += res;
       buffer[size] = '\0';
+      LOG(stderr, "Received buffer %s\n", buffer);
       if (State::BODY == state) {
         if (Type::GET == req.type_) {
           return HTTPCode::OK;
@@ -278,7 +276,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         switch (state) {
           case State::METHOD:
           {
-            LOG(stderr, "Method : %s\n\n", buffer + offset);
+            //LOG(stderr, "Method : %s\n", buffer + offset);
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
             if (HTTPCode::OK != code) {
               LOG(stderr, "Method : %s. Code : %d\n\n", buffer + offset, code);
@@ -289,7 +287,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
           }
           case State::HEADERS:
           {
-            LOG(stderr, "Header : %s\n\n", buffer + offset);
+            //LOG(stderr, "Header : %s\n", buffer + offset);
             bool hasNext;
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
             if (HTTPCode::OK != code) {
@@ -364,6 +362,9 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
   if (size <= 0) {
     return ;
   }
+
+  LOG(stderr, "Sending buffer: %s\n", buffer);
+
 
   int offset = 0;
   while (offset < size) {

@@ -35,11 +35,14 @@ struct Location
     std::string&& _country,
     std::string&& _city,
     const int32_t _distance);
-  Location(const rapidjson::Value& jsonVal);
+  Location(
+    const int32_t id,
+    const rapidjson::Value& jsonVal);
   Location(const Location& location);
   Location& operator=(Location&& location);
+  void cache(const int32_t id);
   bool update(const rapidjson::Value& jsonVal);
-  std::string* getJson(int32_t id);
+  std::string* getJson(const int32_t id);
   Result getJsonAvgScore(std::string& result, char* params, const int32_t paramsSize) const;
   void dump() const;
 };

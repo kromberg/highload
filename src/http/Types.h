@@ -31,7 +31,7 @@ enum HTTPCode
 
 struct Response
 {
-  std::string* body;
+  std::string* body = nullptr;
   bool cached = false;
   ~Response()
   {

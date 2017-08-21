@@ -13,7 +13,6 @@
 
 namespace db
 {
-
 struct tm Storage::time_;
 
 Result Storage::load(const std::string& path)
@@ -59,7 +58,7 @@ Result Storage::load(const std::string& path)
       users_.emplace(
         std::piecewise_construct,
         std::forward_as_tuple(id),
-        std::forward_as_tuple(jsonVal));
+        std::forward_as_tuple(id, jsonVal));
     });
   loadFiles(archive, stats[locationsFilePrefix], "locations",
     [&] (const rapidjson::Value& jsonVal) -> void {
@@ -70,7 +69,7 @@ Result Storage::load(const std::string& path)
       locations_.emplace(
         std::piecewise_construct,
         std::forward_as_tuple(id),
-        std::forward_as_tuple(jsonVal));
+        std::forward_as_tuple(id, jsonVal));
     });
   loadFiles(archive, stats[visitsFilePrefix], "visits",
     [&] (const rapidjson::Value& jsonVal) -> void {
@@ -102,7 +101,7 @@ Result Storage::load(const std::string& path)
       auto res = visits_.emplace(
         std::piecewise_construct,
         std::forward_as_tuple(id),
-        std::forward_as_tuple(locationId, userId, location, user, jsonVal));
+        std::forward_as_tuple(id, locationId, userId, location, user, jsonVal));
       Visit* visit = &res.first->second;
 
       user->visits_.emplace(
@@ -340,11 +339,16 @@ Result Storage::addLocation(const rapidjson::Value& jsonVal)
     distance = val.GetInt();
   }
 
+  LOG(stderr, "Adding new location: <%d, %s, %s, %s, %d>",
+    id, place.c_str(), country.c_str(), city.c_str(), distance);
+
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, true);
   locations_.emplace(
     std::piecewise_construct,
     std::forward_as_tuple(id),
     std::forward_as_tuple(std::move(place), std::move(country), std::move(city), distance));
+
+  LOG(stderr, "New location has been added");
 
   return Result::SUCCESS;
 }
@@ -426,12 +430,13 @@ Result Storage::addVisit(const rapidjson::Value& jsonVal)
   if (locations_.end() == locationIt) {
     return Result::NOT_FOUND;
   }
-  if (382 == locationId) {
-    LOG(stderr, "ADDING VISIT TO 382\n");
-  }
   Location* location = &locationIt->second;
   tbb::spin_rw_mutex::scoped_lock locationLock(location->guard_, true);
   locationsLock.release();
+
+  LOG(stderr, "Adding new visit: <%d, %d, %d, %d, %d>\n",
+    id, locationId, userId, visited_at, mark);
+
 
   tbb::spin_rw_mutex::scoped_lock visitsLock(visitsGuard_, true);
   auto res = visits_.emplace(
@@ -449,6 +454,8 @@ Result Storage::addVisit(const rapidjson::Value& jsonVal)
     std::piecewise_construct,
     std::forward_as_tuple(id),
     std::forward_as_tuple(visit));
+
+  LOG(stderr, "New visit has been added\n");
 
   return Result::SUCCESS;
 }
