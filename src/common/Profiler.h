@@ -60,8 +60,18 @@ public:
       LOG_CRITICAL(stderr, "%20s -> %20lu calls %20lu nsecs\n", op.first.c_str(), op.second.callsCount, op.second.timeNsec);
     }
   }
-
 };
+
+#define START_PROFILER(name) \
+#ifdef PROFILER \
+  common::TimeProfiler tp(name); \
+#endif
+
+#define STOP_PROFILER \
+#ifdef PROFILER \
+  tp.stop(); \
+#endif
+
 
 } // namespace common
 #endif // _PROFILER_H_

@@ -9,25 +9,31 @@
 
 namespace tcp
 {
-using common::TimeProfiler;
-
 Socket::Socket(int sock):
-  sock_(sock)
+  SocketWrapper(sock)
 {}
 
 Socket::~Socket()
 {
-  shutdown();
+  //shutdown();
   close();
 }
 
-Socket::Socket(Socket&& rhs):
+Socket::Socket(const SocketWrapper& rhs):
+  SocketWrapper(rhs)
+{}
+
+SocketWrapper::SocketWrapper(int sock):
+  sock_(sock)
+{}
+
+SocketWrapper::SocketWrapper(SocketWrapper&& rhs):
   sock_(rhs.sock_)
 {
   rhs.sock_ = -1;
 }
 
-Socket& Socket::operator=(Socket&& rhs)
+SocketWrapper& SocketWrapper::operator=(SocketWrapper&& rhs)
 {
   sock_ = rhs.sock_;
   rhs.sock_ = -1;
@@ -35,7 +41,7 @@ Socket& Socket::operator=(Socket&& rhs)
   return *this;
 }
 
-int Socket::create()
+int SocketWrapper::create()
 {
   if (sock_ >= 0) {
     return sock_;
@@ -45,7 +51,7 @@ int Socket::create()
   return sock_;
 }
 
-int Socket::bind(const uint16_t port)
+int SocketWrapper::bind(const uint16_t port)
 {
   if (sock_ < 0) {
     return -1;
@@ -58,43 +64,43 @@ int Socket::bind(const uint16_t port)
   return ::bind(sock_, (struct sockaddr *)&addr, sizeof(addr));
 }
 
-int Socket::listen(int backlog)
+int SocketWrapper::listen(int backlog)
 {
   return ::listen(sock_, backlog);
 }
 
-Socket Socket::accept()
+SocketWrapper SocketWrapper::accept()
 {
   struct sockaddr_in addr = {0};
   socklen_t addrLen = sizeof(addr);
   return ::accept(sock_, (struct sockaddr *) &addr, &addrLen);
 }
 
-int Socket::shutdown(int how)
+int SocketWrapper::shutdown(int how)
 {
   return ::shutdown(sock_, how);
 }
 
-int Socket::close()
+int SocketWrapper::close()
 {
   int res = ::close(sock_);
   sock_ = -1;
   return res;
 }
 
-int Socket::send(const char* buffer, size_t size, int flags)
+int SocketWrapper::send(const char* buffer, size_t size, int flags)
 {
-  //TimeProfiler tp("send");
+  START_PROFILER("send")
   return ::send(sock_, buffer, size, flags);
 }
 
-int Socket::recv(char* buffer, size_t size, int flags)
+int SocketWrapper::recv(char* buffer, size_t size, int flags)
 {
-  //TimeProfiler tp("recv");
+  START_PROFILER("recv")
   return ::recv(sock_, buffer, size, flags);
 }
 
-int Socket::setsockopt(int level, int optname, const void *optval, socklen_t optlen)
+int SocketWrapper::setsockopt(int level, int optname, const void *optval, socklen_t optlen)
 {
   return ::setsockopt(sock_, level, optname, optval, optlen);
 }

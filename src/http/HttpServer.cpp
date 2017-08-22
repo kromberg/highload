@@ -13,9 +13,6 @@
 
 namespace http
 {
-
-using common::TimeProfiler;
-
 static const char* RESPONSE_200 = 
   "HTTP/1.1 200 OK\n"
   "Content-Type: application/json; charset=UTF-8\n"
@@ -57,7 +54,8 @@ static const char* RESPONSE_404 =
 
 HttpServer::HttpServer(db::StoragePtr& storage):
   tcp::TcpServer(),
-  storage_(storage)
+  storage_(storage),
+  threadPool_(32, std::bind(&HttpServer::handleRequest, this, std::placeholders::_1))
 {}
 
 HttpServer::~HttpServer()
@@ -178,9 +176,9 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, char* reqMethod, int32_t s
     return HTTPCode::BAD_REQ;
   }
   *next = '\0';
-  //TimeProfiler tp("url parsing");
+  START_PROFILER("url parsing")
   HTTPCode code = parseURL(req, reqMethod, next - reqMethod);
-  //tp.stop();
+  STOP_PROFILER
   if (HTTPCode::OK != code) {
     //LOG(stderr, "Parsing URL error code = %d\n", code);
     return code;
@@ -216,32 +214,33 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
   return HTTPCode::OK;
 }
 
-void HttpServer::handleRequest(tcp::Socket&& sock)
+void HttpServer::handleRequest(tcp::SocketWrapper& sock)
 {
+  tcp::Socket _sock(sock);
   Request req;
-  HTTPCode code = readRequest(req, sock);
+  HTTPCode code = readRequest(req, _sock);
   if (HTTPCode::OK != code) {
-    sendResponse(sock, code);
+    sendResponse(_sock, code);
     return ;
   }
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
-    sendResponse(sock, code);
+    sendResponse(_sock, code);
     return ;
   }
 
   Response resp;
   code = handler(resp, *storage_, req);
   if (HTTPCode::OK != code) {
-    sendResponse(sock, code);
+    sendResponse(_sock, code);
     return ;
   }
 
   if (Type::POST == req.type_) {
-    sendResponse(sock, HTTPCode::OK);
+    sendResponse(_sock, HTTPCode::OK);
   } else {
-    sendResponse(sock, *resp.body);
+    sendResponse(_sock, *resp.body);
   }
 }
 
@@ -282,9 +281,9 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         switch (state) {
           case State::METHOD:
           {
-            //TimeProfiler tp("req method parsing");
+            START_PROFILER("req method parsing")
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
-            //tp.stop();
+            STOP_PROFILER
             if (HTTPCode::OK != code) {
               LOG(stderr, "Method : %s. Code : %d\n\n", buffer + offset, code);
               return code;
@@ -296,9 +295,9 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
           {
             //LOG(stderr, "Header : %s\n", buffer + offset);
             bool hasNext;
-            //TimeProfiler tp("header parsing");
+            START_PROFILER("header parsing")
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
-            //tp.stop();
+            STOP_PROFILER
             if (HTTPCode::OK != code) {
               LOG(stderr, "Header : %s. Code : %d\n\n", buffer + offset, code);
               return code;
@@ -372,7 +371,7 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
   }
 }
 
-void HttpServer::acceptSocket(tcp::Socket&& sock)
+void HttpServer::acceptSocket(tcp::SocketWrapper& sock)
 {
   {
     int one = 1;
@@ -383,8 +382,8 @@ void HttpServer::acceptSocket(tcp::Socket&& sock)
     sock.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
   }
 
-  //TimeProfiler tp("thread creation");
-  std::thread{&HttpServer::handleRequest, this, std::move(sock)}.detach();
+  START_PROFILER("Pool run")
+  threadPool_.run(sock);
 }
 
 } // namespace http

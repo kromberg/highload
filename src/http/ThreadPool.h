@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <functional>
 #include <vector>
+#include <atomic>
 
 #include <tbb/concurrent_queue.h>
 
@@ -17,33 +18,26 @@ namespace http
 class ThreadPool
 {
 public:
-  typedef std::function<void(tcp::Socket&& sock)> Callback;
+  typedef std::function<void(tcp::SocketWrapper& sock)> Callback;
 private:
   struct ThreadInfo
   {
-    const int32_t id;
     Callback cb;
-    tbb::concurrent_bounded_queue<size_t>& queue;
+    tbb::concurrent_bounded_queue<tcp::SocketWrapper> queue;
 
-    tcp::Socket sock{-1};
-    std::mutex mut;
-    std::condition_variable cv;
-
-    volatile bool working = false;
     volatile bool running = true;
 
-    ThreadInfo(
-      const int32_t _id,
-      const Callback& _cb,
-      tbb::concurrent_bounded_queue<size_t>& _queue) :
-      id(_id), cb(_cb), queue(_queue)
-    {}
+    ThreadInfo(const Callback& _cb) :
+      cb(_cb)
+    {
+      queue.set_capacity(100);
+    }
   };
 
   const size_t threadsCount_;
+  std::atomic<size_t> currentThreadId_;
   std::vector<std::thread> threads_;
   std::vector<ThreadInfo*> threadsInfo_;
-  tbb::concurrent_bounded_queue<size_t> emptyThreads_;
 
 private:
   static void threadFunc(ThreadInfo* ti);
@@ -52,7 +46,7 @@ public:
   ThreadPool(const size_t threadsCount, const Callback& cb);
   ~ThreadPool();
 
-  void run(tcp::Socket&& sock);
+  void run(tcp::SocketWrapper& sock);
 };
 
 } // namespace http

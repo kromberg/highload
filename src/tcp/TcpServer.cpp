@@ -18,12 +18,12 @@ TcpServer::~TcpServer()
 
 void TcpServer::acceptFunc()
 {
-  Socket clientSock;
+  SocketWrapper clientSock;
   int rawSock;
   do {
     clientSock = sock_.accept();
     rawSock = int(clientSock);
-    acceptSocket(std::move(clientSock));
+    acceptSocket(clientSock);
   } while (rawSock >= 0);
 }
 
@@ -74,6 +74,7 @@ Result TcpServer::stop()
   if (acceptThread_.joinable()) {
     sock_.shutdown();
     acceptThread_.join();
+    sock_.close();
   }
   return Result::SUCCESS;
 }

@@ -5,6 +5,7 @@
 #include <tcp/TcpServer.h>
 
 #include "Types.h"
+#include "ThreadPool.h"
 
 namespace http
 {
@@ -12,9 +13,10 @@ class HttpServer : public tcp::TcpServer
 {
 private:
   db::StoragePtr storage_;
+  ThreadPool threadPool_;
 private:
-  void handleRequest(tcp::Socket&& sock);
-  virtual void acceptSocket(tcp::Socket&& sock) override;
+  void handleRequest(tcp::SocketWrapper& sock);
+  virtual void acceptSocket(tcp::SocketWrapper& sock) override;
 
   HTTPCode parseURL(Request& req, char* url, int32_t size);
   HTTPCode parseRequestMethod(Request& req, char* reqMethod, int32_t size);
