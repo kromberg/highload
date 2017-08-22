@@ -37,12 +37,11 @@ int main(int argc, char* argv[])
   }
 
   while (running) {
-    usleep(1000000);
+    usleep(10000000);
+    common::TimeProfiler::print();
   }
 
   server.stop();
-
-  common::TimeProfiler::print();
 
   return 0;
 }

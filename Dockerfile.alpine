@@ -1,17 +1,15 @@
-# CentOS 7
-FROM centos:7
+FROM alpine:3.6
 
 WORKDIR /root
 
-RUN yum install -y epel-release
-RUN yum install -y clang
-RUN yum install -y make
-RUN yum install -y cmake
-RUN yum install -y wget
-RUN yum install -y zlib-devel
-RUN yum install -y perl
-RUN yum install -y gcc
-RUN yum install -y gcc-c++
+RUN apk add --no-cache clang
+RUN apk add --no-cache make
+RUN apk add --no-cache cmake
+RUN apk add --no-cache wget
+RUN apk add --no-cache zlib-dev
+RUN apk add --no-cache perl
+RUN apk add --no-cache gcc
+RUN apk add --no-cache g++
 RUN wget https://nih.at/libzip/libzip-1.2.0.tar.gz
 RUN tar xf libzip-1.2.0.tar.gz && \
     rm libzip-1.2.0.tar.gz && \
@@ -19,7 +17,7 @@ RUN tar xf libzip-1.2.0.tar.gz && \
     ./configure && \
     make -j4 && \
     make install
-RUN yum install -y git
+RUN apk add --no-cache git
 RUN git clone https://github.com/miloyip/rapidjson.git && \
     cd rapidjson && \
     git checkout tags/v1.1.0 && \
@@ -29,16 +27,20 @@ RUN git clone https://github.com/miloyip/rapidjson.git && \
     make -j4 && \
     make install
 RUN wget https://github.com/01org/tbb/archive/2017_U7.tar.gz
-RUN tar xf 2017_U7.tar.gz && \
-    rm 2017_U7.tar.gz && \
-    cd tbb-2017_U7 && \
-    gmake compiler=clang
 
-RUN git clone https://github.com/gperftools/gperftools.git
-RUN yum install -y autoconf
-RUN yum install -y automake
-RUN yum install -y libtool
-RUN cd gperftools && ./autogen.sh && ./configure && make -j4 && make install
+RUN tar xf 2017_U7.tar.gz && \
+    rm 2017_U7.tar.gz
+COPY tbb-mallinfo.patch tbb-2017_U7/
+RUN cd tbb-2017_U7 && \
+    git apply tbb-mallinfo.patch
+RUN cd tbb-2017_U7 && \
+    make compiler=clang
+
+#RUN apk add --no-cache autoconf
+#RUN apk add --no-cache automake
+#RUN apk add --no-cache libtool
+#RUN git clone https://github.com/gperftools/gperftools.git
+#RUN cd gperftools && ./autogen.sh && ./configure && make -j4 && make install
 
 RUN mkdir -p highload/src
 RUN mkdir -p highload/build
@@ -54,8 +56,8 @@ ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/root/tbb-2017_U7/build/linux_intel64_cla
 
 EXPOSE 80
 
-#RUN yum install -y graphviz
-#RUN yum install -y ghostscript
+#RUN apk add graphviz
+#RUN apk add ghostscript
 
 #CMD CPUPROFILE=/tmp/prof/prof.out server.out
 CMD server.out
