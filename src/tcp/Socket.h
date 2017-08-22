@@ -30,6 +30,7 @@ public:
   int recv(char* buffer, size_t size, int flags = 0);
 
   int setsockopt(int level, int optname, const void *optval, socklen_t optlen);
+  int getsockopt(int level, int optname, void *optval, socklen_t *optlen);
 };
 
 class Socket : public SocketWrapper

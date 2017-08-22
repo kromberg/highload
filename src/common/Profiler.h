@@ -62,16 +62,17 @@ public:
   }
 };
 
-#define START_PROFILER(name) \
-#ifdef PROFILER \
-  common::TimeProfiler tp(name); \
+#ifdef PROFILER
+# define START_PROFILER(name) common::TimeProfiler tp(name)
+#else
+# define START_PROFILER(...)
 #endif
 
-#define STOP_PROFILER \
-#ifdef PROFILER \
-  tp.stop(); \
+#ifdef PROFILER
+# define STOP_PROFILER tp.stop()
+#else
+# define STOP_PROFILER
 #endif
-
 
 } // namespace common
 #endif // _PROFILER_H_

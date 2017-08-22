@@ -23,14 +23,13 @@ private:
   struct ThreadInfo
   {
     Callback cb;
-    tbb::concurrent_bounded_queue<tcp::SocketWrapper> queue;
+    tbb::concurrent_queue<tcp::SocketWrapper> queue;
 
     volatile bool running = true;
 
     ThreadInfo(const Callback& _cb) :
       cb(_cb)
     {
-      queue.set_capacity(100);
     }
   };
 

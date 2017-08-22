@@ -57,5 +57,5 @@ EXPOSE 80
 #RUN yum install -y graphviz
 #RUN yum install -y ghostscript
 
-CMD CPUPROFILE=/tmp/prof/prof.out server.out
-#CMD server.out
+#CMD CPUPROFILE=/tmp/prof/prof.out server.out
+CMD server.out

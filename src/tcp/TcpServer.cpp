@@ -52,15 +52,36 @@ Result TcpServer::start(const uint16_t port)
   }
   {
     int one = 1;
-    sock_.setsockopt(IPPROTO_TCP, TCP_DEFER_ACCEPT, &one, sizeof(one));
+    int res = sock_.setsockopt(IPPROTO_TCP, TCP_DEFER_ACCEPT, &one, sizeof(one));
+    if (0 != res) {
+      LOG_CRITICAL(stderr, "Cannot set TCP_DEFER_ACCEPT on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+    }
   }
   {
     int one = 1;
-    sock_.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+    int res = sock_.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+    if (0 != res) {
+      LOG_CRITICAL(stderr, "Cannot set TCP_NODELAY on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+    }
   }
   {
     int one = 1;
-    sock_.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
+    int res = sock_.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
+    if (0 != res) {
+      LOG_CRITICAL(stderr, "Cannot set TCP_QUICKACK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+    }
+  }
+
+  {
+    int bufferSize = 4 * 1024;
+    int res = sock_.setsockopt(SOL_SOCKET, SO_SNDBUF, &bufferSize, sizeof(bufferSize));
+    if (0 != res) {
+      LOG_CRITICAL(stderr, "Cannot set SO_SNDBUF on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+    }
+    res = sock_.setsockopt(SOL_SOCKET, SO_RCVBUF, &bufferSize, sizeof(bufferSize));
+    if (0 != res) {
+      LOG_CRITICAL(stderr, "Cannot set SO_RCVBUF on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+    }
   }
 
   std::thread tmpThread(&TcpServer::acceptFunc, this);

@@ -23,7 +23,7 @@ ThreadPool::~ThreadPool()
 {
   for (auto ti : threadsInfo_) {
     ti->running = false;
-    ti->queue.abort();
+    //ti->queue.abort();
   }
   for (auto& t : threads_) {
     t.join();
@@ -37,12 +37,10 @@ void ThreadPool::threadFunc(ThreadInfo* ti)
 {
   tcp::SocketWrapper sock;
   while (ti->running) {
-    try {
-      ti->queue.pop(sock);
-      ti->cb(sock);
-    } catch (...) {
-      break;
+    if (!ti->queue.try_pop(sock)) {
+      continue;
     }
+    ti->cb(sock);
   }
 }
 

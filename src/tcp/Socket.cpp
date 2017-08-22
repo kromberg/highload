@@ -90,18 +90,23 @@ int SocketWrapper::close()
 
 int SocketWrapper::send(const char* buffer, size_t size, int flags)
 {
-  START_PROFILER("send")
+  START_PROFILER("send");
   return ::send(sock_, buffer, size, flags);
 }
 
 int SocketWrapper::recv(char* buffer, size_t size, int flags)
 {
-  START_PROFILER("recv")
+  START_PROFILER("recv");
   return ::recv(sock_, buffer, size, flags);
 }
 
 int SocketWrapper::setsockopt(int level, int optname, const void *optval, socklen_t optlen)
 {
   return ::setsockopt(sock_, level, optname, optval, optlen);
+}
+
+int SocketWrapper::getsockopt(int level, int optname, void *optval, socklen_t *optlen)
+{
+  return ::getsockopt(sock_, level, optname, optval, optlen);
 }
 } // namespace tcp
