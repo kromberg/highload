@@ -111,7 +111,6 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
       case State::TABLE1:
       case State::TABLE2:
       {
-        //START_PROFILER("table lookup");
         //LOG(stderr, "Searching for table: %s\n", prev);
         auto it = strToTableMap.find(std::string(prev, size));
         if (strToTableMap.end() == it) {
@@ -126,7 +125,6 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
           req.table2_ = it->second;
           state = State::ERROR;
         }
-        //STOP_PROFILER;
         break;
       }
       case State::ID:
@@ -178,9 +176,7 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, char* reqMethod, int32_t s
     return HTTPCode::BAD_REQ;
   }
   *next = '\0';
-  //START_PROFILER("url parsing");
   HTTPCode code = parseURL(req, reqMethod, next - reqMethod);
-  //STOP_PROFILER;
   if (HTTPCode::OK != code) {
     LOG(stderr, "Parsing URL error code = %d\n", code);
     return code;
@@ -226,7 +222,12 @@ void HttpServer::handleRequest(tcp::SocketWrapper& sock)
 {
   tcp::Socket _sock(sock);
   Request req;
-  HTTPCode code = readRequest(req, _sock);
+  HTTPCode code;
+  {
+    START_PROFILER("readRequest");
+    code = readRequest(req, _sock);
+    STOP_PROFILER;
+  }
   if (HTTPCode::OK != code) {
     sendResponse(_sock, code);
     return ;
@@ -239,9 +240,11 @@ void HttpServer::handleRequest(tcp::SocketWrapper& sock)
   }
 
   Response resp;
-  START_PROFILER("logic");
-  code = handler(resp, *storage_, req);
-  STOP_PROFILER;
+  {
+    START_PROFILER("handler");
+    code = handler(resp, *storage_, req);
+    STOP_PROFILER;
+  }
   if (HTTPCode::OK != code) {
     sendResponse(_sock, code);
     return ;
@@ -288,9 +291,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
         switch (state) {
           case State::METHOD:
           {
-            //START_PROFILER("req method parsing");
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
-            //STOP_PROFILER;
             if (HTTPCode::OK != code) {
               LOG(stderr, "Method : %s. Code : %d\n", buffer + offset, code);
               return code;
@@ -303,11 +304,8 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::Socket& sock)
           }
           case State::HEADERS:
           {
-            //LOG(stderr, "Header : %s\n", buffer + offset);
             bool hasNext;
-            //START_PROFILER("header parsing");
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
-            //STOP_PROFILER;
             if (HTTPCode::OK != code) {
               LOG(stderr, "Header : %s. Code : %d\n", buffer + offset, code);
               return code;
@@ -371,7 +369,7 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
 
   int offset = 0;
   while (offset < size) {
-    int sent = sock.send(buffer + offset, size - offset, 0);
+    int sent = sock.send(buffer + offset, size - offset, MSG_DONTWAIT);
     if (sent < 0) {
       break;
     }
@@ -396,7 +394,6 @@ void HttpServer::acceptSocket(tcp::SocketWrapper& sock)
     }
   }
 
-  START_PROFILER("Pool run");
   threadPool_.run(sock);
 }
 
