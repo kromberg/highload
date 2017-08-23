@@ -50,7 +50,7 @@ RUN cd highload/build && CC=/usr/bin/clang CXX=/usr/bin/clang++ cmake -DCMAKE_BU
 #RUN cd highload/build && CC=/usr/bin/clang CXX=/usr/bin/clang++ cmake .. && make -j4 && make install
 
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/usr/lib:/usr/lib64
-ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/root/tbb-2017_U7/build/linux_intel64_clang_cc6.3.0_libc_kernel4.9.36_release
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/root/tbb-2017_U7/build/linux_intel64_clang_cc4.8.5_libc2.17_kernel4.9.36_release
 
 EXPOSE 80
 

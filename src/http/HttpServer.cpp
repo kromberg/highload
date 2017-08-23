@@ -6,6 +6,9 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include <unistd.h>
+#include <fcntl.h>
+
 #include <common/Profiler.h>
 
 #include "StateMachine.h"
@@ -367,6 +370,9 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
 
   LOG(stderr, "Sending buffer: %s\n", buffer);
 
+  int flags = fcntl(int(sock), F_GETFL, 0);
+  fcntl(int(sock), F_SETFL, flags | O_NONBLOCK);
+
   int offset = 0;
   while (offset < size) {
     int sent = sock.send(buffer + offset, size - offset, MSG_DONTWAIT);
@@ -379,21 +385,6 @@ void HttpServer::send(tcp::Socket& sock, const char* buffer, int size)
 
 void HttpServer::acceptSocket(tcp::SocketWrapper& sock)
 {
-  {
-    int one = 1;
-    int res = sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-    if (0 != res) {
-      LOG_CRITICAL(stderr, "Cannot set TCP_NODELAY on socket, errno = %s(%d)\n", std::strerror(errno), errno);
-    }
-  }
-  {
-    int one = 1;
-    int res = sock.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
-    if (0 != res) {
-      LOG_CRITICAL(stderr, "Cannot set TCP_QUICKACK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
-    }
-  }
-
   threadPool_.run(sock);
 }
 
