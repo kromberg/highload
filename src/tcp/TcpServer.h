@@ -20,8 +20,10 @@ private:
 
 private:
   void acceptFunc();
-  virtual void acceptSocket(SocketWrapper& sock) = 0;
+  virtual void acceptSocket(SocketWrapper sock) = 0;
 
+protected:
+  virtual Result doStart() { return Result::SUCCESS; }
 public:
   TcpServer();
   virtual ~TcpServer();
