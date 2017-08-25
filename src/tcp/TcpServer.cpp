@@ -85,7 +85,7 @@ Result TcpServer::start(const uint16_t port)
     }
   }
 
-  /*{
+  {
     int bufferSize = 4 * 1024;
     int res = sock_.setsockopt(SOL_SOCKET, SO_SNDBUF, &bufferSize, sizeof(bufferSize));
     if (0 != res) {
@@ -97,7 +97,7 @@ Result TcpServer::start(const uint16_t port)
       LOG_CRITICAL(stderr, "Cannot set SO_RCVBUF on socket, errno = %s(%d)\n", std::strerror(errno), errno);
       return Result::FAILED;
     }
-  }*/
+  }
 
   std::thread tmpThread(&TcpServer::acceptFunc, this);
   acceptThread_ = std::move(tmpThread);

@@ -16,6 +16,7 @@
 
 #include <common/Types.h>
 
+#include "Utils.h"
 #include "User.h"
 #include "Location.h"
 #include "Visit.h"
@@ -50,19 +51,19 @@ public:
   static Result loadTime(const std::string& path);
   static struct tm getTime();
 
-  Result addUser(const rapidjson::Value& jsonVal);
-  Result updateUser(const int32_t id, const rapidjson::Value& jsonVal);
-  Result getUser(std::string*& resp, const int32_t id);
-  Result getUserVisits(std::string& resp, const int32_t id, char* params, const int32_t paramsSize);
+  Result addUser(const char* content);
+  Result updateUser(const int32_t id, const char* content);
+  Result getUser(ConstBuffer& buffer, const int32_t id);
+  Result getUserVisits(Buffer& buffer, const int32_t id, char* params, const int32_t paramsSize);
 
-  Result addLocation(const rapidjson::Value& jsonVal);
-  Result updateLocation(const int32_t id, const rapidjson::Value& jsonVal);
-  Result getLocation(std::string*& resp, const int32_t id);
-  Result getLocationAvgScore(std::string& resp, const int32_t id, char* params, const int32_t paramsSize);
+  Result addLocation(const char* content);
+  Result updateLocation(const int32_t id, const char* content);
+  Result getLocation(ConstBuffer& buffer, const int32_t id);
+  Result getLocationAvgScore(Buffer& buffer, const int32_t id, char* params, const int32_t paramsSize);
 
-  Result addVisit(const rapidjson::Value& jsonVal);
-  Result updateVisit(const int32_t id, const rapidjson::Value& jsonVal);
-  Result getVisit(std::string*& resp, const int32_t id);
+  Result addVisit(const char* content);
+  Result updateVisit(const int32_t id, const char* content);
+  Result getVisit(ConstBuffer& buffer, const int32_t id);
 };
 
 typedef std::shared_ptr<Storage> StoragePtr;

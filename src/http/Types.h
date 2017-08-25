@@ -3,6 +3,8 @@
 
 #include <rapidjson/document.h>
 
+#include <db/Utils.h>
+
 namespace http
 {
 enum class Type
@@ -24,6 +26,7 @@ enum class Table
 
 enum HTTPCode
 {
+  NO_ERROR = 0,
   OK = 200,
   BAD_REQ = 400,
   NOT_FOUND = 404,
@@ -31,13 +34,13 @@ enum HTTPCode
 
 struct Response
 {
-  std::string* body = nullptr;
-  bool cached = false;
-  ~Response()
+  db::ConstBuffer constBuffer;
+  db::Buffer buffer;
+  char arr[8 * 1024];
+  Response()
   {
-    if (!cached) {
-      delete body;
-    }
+    buffer.buffer = arr;
+    buffer.capacity = sizeof(arr);
   }
 };
 
@@ -53,12 +56,8 @@ struct Request
   bool hasContentType_ = false;
   int32_t contentLength_ = 0;
 
-  rapidjson::Document json_;
-
-  void dump() {
-    LOG(stderr, "Type = %d; Table1 = %d; Table2 = %d; ID = %d; Params = %s\n",
-      type_, table1_, table2_, id_, params_);
-  }
+  const char* content_ = nullptr;
+  bool keepalive_ = false;
 };
 } // namespace http
 

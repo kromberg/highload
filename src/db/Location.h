@@ -11,6 +11,7 @@
 
 #include <common/Types.h>
 
+#include "Utils.h"
 #include "Visit.h"
 
 namespace db
@@ -26,10 +27,12 @@ struct Location
   std::string city;
   int32_t distance;
 
-  std::string cache_;
+  char buffer_[1024];
+  int bufferSize_ = 0;
 
   std::unordered_map<int32_t, Visit*> visits_;
 
+  Location();
   Location(
     std::string&& _place,
     std::string&& _country,
@@ -42,8 +45,8 @@ struct Location
   Location& operator=(Location&& location);
   void cache(const int32_t id);
   bool update(const rapidjson::Value& jsonVal);
-  std::string* getJson(const int32_t id);
-  Result getJsonAvgScore(std::string& result, char* params, const int32_t paramsSize) const;
+  void getJson(ConstBuffer& buffer, const int32_t id);
+  Result getJsonAvgScore(Buffer& buffer, char* params, const int32_t paramsSize) const;
   void dump() const;
 };
 } // namespace db

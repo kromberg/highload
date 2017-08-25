@@ -8,6 +8,8 @@
 
 #include <rapidjson/document.h>
 
+#include "Utils.h"
+
 namespace db
 {
 struct User;
@@ -21,11 +23,13 @@ struct Visit
   int32_t visited_at;
   uint16_t mark;
 
-  std::string cache_;
-
   Location* location_;
   User* user_;
 
+  char buffer_[1024];
+  int bufferSize_ = 0;
+
+  Visit();
   Visit(
     const int32_t locationId,
     const int32_t userId,
@@ -44,7 +48,7 @@ struct Visit
   Visit& operator=(Visit&& visit);
   void cache(const int32_t id);
   bool update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal);
-  std::string* getJson(const int32_t id);
+  void getJson(ConstBuffer& buffer, const int32_t id);
   void dump() const;
 };
 } // namespace db

@@ -13,6 +13,27 @@ namespace db
   }\
 }
 
+#define DB_RESPONSE_200 \
+  "HTTP/1.1 200 OK\n"\
+  "Content-Type: application/json; charset=UTF-8\n"\
+  "Connection: keep-alive\n"\
+  "Content-Length: %5d\n"\
+  "\n"
+#define DB_RESPONSE_200_SIZE 108
+
+struct ConstBuffer
+{
+  const char* buffer = nullptr;
+  int size = 0;
+};
+
+struct Buffer
+{
+  char* buffer = nullptr;
+  int capacity = 0;
+  int size = 0;
+};
+
 inline void uriDecode(std::string& res, char* str, int32_t size)
 {
    // Note from RFC1630: "Sequences which start with a percent

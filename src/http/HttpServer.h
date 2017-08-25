@@ -22,11 +22,14 @@ private:
   db::StoragePtr storage_;
   ThreadPool threadPool_;
 
+#if 0
   int pipe200_[2];
   int pipe400_[2];
   int pipe404_[2];
   int outPipes_[THREADS_COUNT][2];
-  std::atomic<size_t> threadIdx_;
+  //std::atomic<size_t> threadIdx_;
+#endif
+
 private:
   void handleRequest(tcp::SocketWrapper sock);
   virtual void acceptSocket(tcp::SocketWrapper sock) override;
@@ -36,8 +39,8 @@ private:
   HTTPCode parseHeader(Request& req, bool& hasNext, char* header, int32_t size);
   HTTPCode readRequest(Request& req, tcp::SocketWrapper sock);
 
-  void sendResponse(tcp::SocketWrapper sock, const HTTPCode code);
-  void sendResponse(tcp::SocketWrapper sock, const std::string& body);
+  void sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool keepalive);
+  void sendResponse(tcp::SocketWrapper sock, const Response& resp, bool keepalive);
   void send(tcp::SocketWrapper sock, const char* buffer, int32_t size);
   void write(int fd, const char* buffer, int32_t size);
 

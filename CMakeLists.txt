@@ -22,7 +22,7 @@ link_directories(${TBBLIB_ROOT})
 
 find_package(RapidJSON)
 
-add_definitions(-DPROFILER)
+#add_definitions(-DPROFILER)
 
 add_subdirectory(src/common)
 add_subdirectory(src/http)

@@ -11,6 +11,7 @@
 
 #include <common/Types.h>
 
+#include "Utils.h"
 #include "Visit.h"
 
 namespace db
@@ -27,10 +28,12 @@ struct User
   int32_t birth_date;
   char gender;
 
-  std::string cache_;
+  char buffer_[1024];
+  int bufferSize_ = 0;
 
   std::unordered_map<int32_t, Visit*> visits_;
 
+  User();
   User(
     std::string&& _email,
     std::string&& _first_name,
@@ -45,6 +48,8 @@ struct User
   void cache(const int32_t id);
   bool update(const rapidjson::Value& jsonVal);
   std::string* getJson(const int32_t id);
+  void getJson(ConstBuffer& buffer, const int32_t id);
+  Result getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSize) const;
   Result getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const;
   void dump() const;
 };

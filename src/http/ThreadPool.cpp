@@ -23,7 +23,6 @@ ThreadPool::~ThreadPool()
 {
   for (auto ti : threadsInfo_) {
     ti->running = false;
-    //ti->queue.abort();
   }
   for (auto& t : threads_) {
     t.join();

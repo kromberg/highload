@@ -11,6 +11,9 @@
 
 namespace db
 {
+Location::Location()
+{}
+
 Location::Location(
   std::string&& _place,
   std::string&& _country,
@@ -46,70 +49,28 @@ Location& Location::operator=(Location&& location)
   country = std::move(location.country);
   city = std::move(location.city);
   distance = std::move(location.distance);
-  cache_.clear();
+  bufferSize_ = 0;
   return *this;
 }
 
 void Location::cache(const int32_t id)
 {
-  cache_.reserve(53 + 10 + place.size() + country.size() + city.size() + 10 + 16);
-  cache_.clear();
-  cache_ += "{";
-  cache_ += "\"id\":" + std::to_string(id) + ",";
-  cache_ += "\"place\":\"" + place + "\",";
-  cache_ += "\"country\":\"" + country + "\",";
-  cache_ += "\"city\":\"" + city + "\",";
-  cache_ += "\"distance\":" + std::to_string(distance);
-  cache_ += "}";
+  int size =
+    snprintf(buffer_ + DB_RESPONSE_200_SIZE, sizeof(buffer_) - DB_RESPONSE_200_SIZE,
+      "{\"id\":%d,\"place\":\"%s\",\"country\":\"%s\",\"city\":\"%s\",\"distance\":%d}",
+      id, place.c_str(), country.c_str(), city.c_str(), distance);
+  bufferSize_ = snprintf(buffer_, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+  buffer_[bufferSize_ - 1] = '\n';
+  bufferSize_ += size;
 }
 
-bool Location::update(const rapidjson::Value& jsonVal)
+void Location::getJson(ConstBuffer& buffer, const int32_t id)
 {
-  using namespace rapidjson;
-  Location tmp(*this);
-  if (jsonVal.HasMember("place")) {
-    const Value& val = jsonVal["place"];
-    if (!val.IsString()) {
-      return false;
-    }
-    tmp.place = std::string(val.GetString());
+  if (0 == bufferSize_) {
+    cache(id);
   }
-
-  if (jsonVal.HasMember("country")) {
-    const Value& val = jsonVal["country"];
-    if (!val.IsString()) {
-      return false;
-    }
-    tmp.country = std::string(val.GetString());
-  }
-
-  if (jsonVal.HasMember("city")) {
-    const Value& val = jsonVal["city"];
-    if (!val.IsString()) {
-      return false;
-    }
-    tmp.city = std::string(val.GetString());
-  }
-
-  if (jsonVal.HasMember("distance")) {
-    const Value& val = jsonVal["distance"];
-    if (!val.IsInt()) {
-      return false;
-    }
-    tmp.distance = val.GetInt();
-  }
-
-  *this = std::move(tmp);
-  return true;
-}
-
-std::string* Location::getJson(const int32_t id)
-{
-  if (!cache_.empty()) {
-    return &cache_;
-  }
-  cache(id);
-  return &cache_;
+  buffer.buffer = buffer_;
+  buffer.size = bufferSize_;
 }
 
 static std::string to_string(const double val)
@@ -119,7 +80,7 @@ static std::string to_string(const double val)
   return ss.str();
 }
 
-Result Location::getJsonAvgScore(std::string& result, char* params, const int32_t paramsSize) const
+Result Location::getJsonAvgScore(Buffer& buffer, char* params, const int32_t paramsSize) const
 {
   struct Parameters
   {
@@ -207,11 +168,12 @@ Result Location::getJsonAvgScore(std::string& result, char* params, const int32_
     avg = (1.0 * sum) / count;
   }
 
-  result.reserve(32);
-  result.clear();
-  result += "{";
-  result += "\"avg\":" + db::to_string(avg);
-  result += "}";
+  int size =
+    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, buffer.capacity - DB_RESPONSE_200_SIZE,
+      "{\"avg\":%s}", db::to_string(avg).c_str());
+  buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+  buffer.buffer[buffer.size - 1] = '\n';
+  buffer.size += size;
   return Result::SUCCESS;
 }
 void Location::dump() const

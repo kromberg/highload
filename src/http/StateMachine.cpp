@@ -82,7 +82,7 @@ HTTPCode StateMachine::addOrUpdateVisit(Response& resp, db::Storage& storage, Re
 
 HTTPCode StateMachine::addUser(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.addUser(req.json_);
+  Result res = storage.addUser(req.content_);
   if (Result::SUCCESS != res) {
     return HTTPCode::BAD_REQ;
   }
@@ -92,7 +92,7 @@ HTTPCode StateMachine::addUser(Response& resp, db::Storage& storage, Request& re
 
 HTTPCode StateMachine::addLocation(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.addLocation(req.json_);
+  Result res = storage.addLocation(req.content_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -104,7 +104,7 @@ HTTPCode StateMachine::addLocation(Response& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::addVisit(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.addVisit(req.json_);
+  Result res = storage.addVisit(req.content_);
   if (Result::SUCCESS != res) {
     return HTTPCode::BAD_REQ;
   }
@@ -114,7 +114,7 @@ HTTPCode StateMachine::addVisit(Response& resp, db::Storage& storage, Request& r
 
 HTTPCode StateMachine::updateUser(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.updateUser(req.id_, req.json_);
+  Result res = storage.updateUser(req.id_, req.content_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -126,7 +126,7 @@ HTTPCode StateMachine::updateUser(Response& resp, db::Storage& storage, Request&
 
 HTTPCode StateMachine::updateLocation(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.updateLocation(req.id_, req.json_);
+  Result res = storage.updateLocation(req.id_, req.content_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -138,7 +138,7 @@ HTTPCode StateMachine::updateLocation(Response& resp, db::Storage& storage, Requ
 
 HTTPCode StateMachine::updateVisit(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.updateVisit(req.id_, req.json_);
+  Result res = storage.updateVisit(req.id_, req.content_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -150,8 +150,7 @@ HTTPCode StateMachine::updateVisit(Response& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::getUser(Response& resp, db::Storage& storage, Request& req)
 {
-  resp.cached = true;
-  Result res = storage.getUser(resp.body, req.id_);
+  Result res = storage.getUser(resp.constBuffer, req.id_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -163,8 +162,7 @@ HTTPCode StateMachine::getUser(Response& resp, db::Storage& storage, Request& re
 
 HTTPCode StateMachine::getLocation(Response& resp, db::Storage& storage, Request& req)
 {
-  resp.cached = true;
-  Result res = storage.getLocation(resp.body, req.id_);
+  Result res = storage.getLocation(resp.constBuffer, req.id_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -176,8 +174,7 @@ HTTPCode StateMachine::getLocation(Response& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::getVisit(Response& resp, db::Storage& storage, Request& req)
 {
-  resp.cached = true;
-  Result res = storage.getVisit(resp.body, req.id_);
+  Result res = storage.getVisit(resp.constBuffer, req.id_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -189,8 +186,7 @@ HTTPCode StateMachine::getVisit(Response& resp, db::Storage& storage, Request& r
 
 HTTPCode StateMachine::getUserVisits(Response& resp, db::Storage& storage, Request& req)
 {
-  resp.body = new std::string;
-  Result res = storage.getUserVisits(*resp.body, req.id_, req.params_, req.paramsSize_);
+  Result res = storage.getUserVisits(resp.buffer, req.id_, req.params_, req.paramsSize_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -201,8 +197,7 @@ HTTPCode StateMachine::getUserVisits(Response& resp, db::Storage& storage, Reque
 
 HTTPCode StateMachine::getLocationAvgScore(Response& resp, db::Storage& storage, Request& req)
 {
-  resp.body = new std::string;
-  Result res = storage.getLocationAvgScore(*resp.body, req.id_, req.params_, req.paramsSize_);
+  Result res = storage.getLocationAvgScore(resp.buffer, req.id_, req.params_, req.paramsSize_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {

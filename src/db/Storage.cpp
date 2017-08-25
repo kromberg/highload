@@ -11,9 +11,41 @@
 
 #include "Storage.h"
 
+#include "UserHandler.h"
+#include "LocationHandler.h"
+#include "VisitHandler.h"
+
 namespace db
 {
 struct tm Storage::time_;
+
+std::unordered_map<std::string, UserHandler::State> UserHandler::strToState =
+{
+  { "id" ,          UserHandler::State::ID},
+  { "email" ,       UserHandler::State::EMAIL},
+  { "first_name" ,  UserHandler::State::FIRST_NAME},
+  { "last_name" ,   UserHandler::State::LAST_NAME},
+  { "birth_date" ,  UserHandler::State::BIRTH_DATE},
+  { "gender" ,      UserHandler::State::GENDER},
+};
+
+std::unordered_map<std::string, LocationHandler::State> LocationHandler::strToState =
+{
+  { "id" ,          LocationHandler::State::ID},
+  { "place" ,       LocationHandler::State::PLACE},
+  { "country" ,     LocationHandler::State::COUNTRY},
+  { "city" ,        LocationHandler::State::CITY},
+  { "distance" ,    LocationHandler::State::DISTANCE},
+};
+
+std::unordered_map<std::string, VisitHandler::State> VisitHandler::strToState =
+{
+  { "id" ,          VisitHandler::State::ID},
+  { "location" ,    VisitHandler::State::LOCATION},
+  { "user" ,        VisitHandler::State::USER},
+  { "visited_at" ,  VisitHandler::State::VISITED_AT},
+  { "mark" ,        VisitHandler::State::MARK},
+};
 
 Result Storage::load(const std::string& path)
 {
@@ -189,279 +221,34 @@ struct tm Storage::getTime()
   return time_;
 }
 
-Result Storage::addUser(const rapidjson::Value& jsonVal)
+Result Storage::addUser(const char* content)
 {
   using namespace rapidjson;
-  if (!jsonVal.HasMember("id")) {
+
+  User user;
+  UserHandler handler(user);
+  Reader reader;
+  StringStream ss(content);
+  if (!reader.Parse(ss, handler)) {
     return Result::FAILED;
-  }
-  int32_t id;
-  {
-    const Value& val = jsonVal["id"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    id = val.GetInt();
   }
 
-  if (!jsonVal.HasMember("email")) {
+  if (handler.filledFields_ < 6) {
     return Result::FAILED;
-  }
-  std::string email;
-  {
-    const Value& val = jsonVal["email"];
-    if (!val.IsString()) {
-      return Result::FAILED;
-    }
-    email = std::string(val.GetString());
-  }
-
-  if (!jsonVal.HasMember("first_name")) {
-    return Result::FAILED;
-  }
-  std::string first_name;
-  {
-    const Value& val = jsonVal["first_name"];
-    if (!val.IsString()) {
-      return Result::FAILED;
-    }
-    first_name = std::string(val.GetString());
-  }
-
-  if (!jsonVal.HasMember("last_name")) {
-    return Result::FAILED;
-  }
-  std::string last_name;
-  {
-    const Value& val = jsonVal["last_name"];
-    if (!val.IsString()) {
-      return Result::FAILED;
-    }
-    last_name = std::string(val.GetString());
-  }
-
-  if (!jsonVal.HasMember("birth_date")) {
-    return Result::FAILED;
-  }
-  int32_t birth_date;
-  {
-    const Value& val = jsonVal["birth_date"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    birth_date = val.GetInt();
-  }
-
-  if (!jsonVal.HasMember("gender")) {
-    return Result::FAILED;
-  }
-  char gender;
-  {
-    const Value& val = jsonVal["gender"];
-    if (!val.IsString()) {
-      return Result::FAILED;
-    }
-    gender = *val.GetString();
-    if (gender != 'f' && gender != 'm') {
-      return Result::FAILED;
-    }
   }
 
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, true);
   users_.emplace(
     std::piecewise_construct,
-    std::forward_as_tuple(id),
-    std::forward_as_tuple(std::move(email), std::move(first_name), std::move(last_name), birth_date, gender));
+    std::forward_as_tuple(handler.id_),
+    std::forward_as_tuple(std::move(user)));
 
   return Result::SUCCESS;
 }
 
-Result Storage::addLocation(const rapidjson::Value& jsonVal)
+Result Storage::updateUser(const int32_t id, const char* content)
 {
   using namespace rapidjson;
-  if (!jsonVal.HasMember("id")) {
-    return Result::FAILED;
-  }
-  int32_t id;
-  {
-    const Value& val = jsonVal["id"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    id = val.GetInt();
-  }
-
-  if (!jsonVal.HasMember("place")) {
-    return Result::FAILED;
-  }
-  std::string place;
-  {
-    const Value& val = jsonVal["place"];
-    if (!val.IsString()) {
-      return Result::FAILED;
-    }
-    place = std::string(val.GetString());
-  }
-
-  if (!jsonVal.HasMember("country")) {
-    return Result::FAILED;
-  }
-  std::string country;
-  {
-    const Value& val = jsonVal["country"];
-    if (!val.IsString()) {
-      return Result::FAILED;
-    }
-    country = std::string(val.GetString());
-  }
-
-  if (!jsonVal.HasMember("city")) {
-    return Result::FAILED;
-  }
-  std::string city;
-  {
-    const Value& val = jsonVal["city"];
-    if (!val.IsString()) {
-      return Result::FAILED;
-    }
-    city = std::string(val.GetString());
-  }
-
-  if (!jsonVal.HasMember("distance")) {
-    return Result::FAILED;
-  }
-  int32_t distance;
-  {
-    const Value& val = jsonVal["distance"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    distance = val.GetInt();
-  }
-
-  LOG(stderr, "Adding new location: <%d, %s, %s, %s, %d>",
-    id, place.c_str(), country.c_str(), city.c_str(), distance);
-
-  tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, true);
-  locations_.emplace(
-    std::piecewise_construct,
-    std::forward_as_tuple(id),
-    std::forward_as_tuple(std::move(place), std::move(country), std::move(city), distance));
-
-  LOG(stderr, "New location has been added");
-
-  return Result::SUCCESS;
-}
-
-Result Storage::addVisit(const rapidjson::Value& jsonVal)
-{
-  using namespace rapidjson;
-  if (!jsonVal.HasMember("id")) {
-    return Result::FAILED;
-  }
-  int32_t id;
-  {
-    const Value& val = jsonVal["id"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    id = val.GetInt();
-  }
-
-  if (!jsonVal.HasMember("location")) {
-    return Result::FAILED;
-  }
-  int32_t locationId;
-  {
-    const Value& val = jsonVal["location"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    locationId = val.GetInt();
-  }
-
-  if (!jsonVal.HasMember("user")) {
-    return Result::FAILED;
-  }
-  int32_t userId;
-  {
-    const Value& val = jsonVal["user"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    userId = val.GetInt();
-  }
-
-  if (!jsonVal.HasMember("visited_at")) {
-    return Result::FAILED;
-  }
-  int32_t visited_at;
-  {
-    const Value& val = jsonVal["visited_at"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    visited_at = val.GetInt();
-  }
-
-  if (!jsonVal.HasMember("mark")) {
-    return Result::FAILED;
-  }
-  int32_t mark;
-  {
-    const Value& val = jsonVal["mark"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    mark = val.GetInt();
-  }
-
-  tbb::spin_rw_mutex::scoped_lock usersLock(usersGuard_, true);
-  auto userIt = users_.find(userId);
-  if (users_.end() == userIt) {
-    return Result::NOT_FOUND;
-  }
-  User* user = &userIt->second;
-  tbb::spin_rw_mutex::scoped_lock userLock(user->guard_, true);
-  usersLock.release();
-
-  tbb::spin_rw_mutex::scoped_lock locationsLock(locationsGuard_, true);
-  auto locationIt = locations_.find(locationId);
-  if (locations_.end() == locationIt) {
-    return Result::NOT_FOUND;
-  }
-  Location* location = &locationIt->second;
-  tbb::spin_rw_mutex::scoped_lock locationLock(location->guard_, true);
-  locationsLock.release();
-
-  LOG(stderr, "Adding new visit: <%d, %d, %d, %d, %d>\n",
-    id, locationId, userId, visited_at, mark);
-
-
-  tbb::spin_rw_mutex::scoped_lock visitsLock(visitsGuard_, true);
-  auto res = visits_.emplace(
-    std::piecewise_construct,
-    std::forward_as_tuple(id),
-    std::forward_as_tuple(locationId, userId, visited_at, mark, location, user));
-  Visit* visit = &res.first->second;
-
-  user->visits_.emplace(
-    std::piecewise_construct,
-    std::forward_as_tuple(id),
-    std::forward_as_tuple(visit));
-
-  location->visits_.emplace(
-    std::piecewise_construct,
-    std::forward_as_tuple(id),
-    std::forward_as_tuple(visit));
-
-  LOG(stderr, "New visit has been added\n");
-
-  return Result::SUCCESS;
-}
-
-Result Storage::updateUser(const int32_t id, const rapidjson::Value& jsonVal)
-{
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
   if (users_.end() == it) {
@@ -469,68 +256,114 @@ Result Storage::updateUser(const int32_t id, const rapidjson::Value& jsonVal)
   }
   tbb::spin_rw_mutex::scoped_lock userLock(it->second.guard_, true);
   l.release();
-  if (!it->second.update(jsonVal)) {
+  User tmpUser(it->second);
+  UserHandler handler(tmpUser);
+  Reader reader;
+  StringStream ss(content);
+  if (!reader.Parse(ss, handler)) {
     return Result::FAILED;
   }
+
+  if (0 == handler.filledFields_) {
+    return Result::FAILED;
+  }
+
+  it->second = std::move(tmpUser);
 
   return Result::SUCCESS;
 }
 
-Result Storage::updateLocation(const int32_t id, const rapidjson::Value& jsonVal)
+Result Storage::addLocation(const char* content)
+{
+  using namespace rapidjson;
+  Location location;
+  LocationHandler handler(location);
+  Reader reader;
+  StringStream ss(content);
+  if (!reader.Parse(ss, handler)) {
+    return Result::FAILED;
+  }
+
+  if (handler.filledFields_ < 5) {
+    return Result::FAILED;
+  }
+
+  tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, true);
+  locations_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(handler.id_),
+    std::forward_as_tuple(std::move(location)));
+
+  return Result::SUCCESS;
+}
+
+Result Storage::updateLocation(const int32_t id, const char* content)
 {
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);
   if (locations_.end() == it) {
     return Result::NOT_FOUND;
   }
-  l.upgrade_to_writer();
-  if (!it->second.update(jsonVal)) {
+  tbb::spin_rw_mutex::scoped_lock locationLock(it->second.guard_, true);
+  l.release();
+
+  Location tmpLocation(it->second);
+  LocationHandler handler(tmpLocation);
+  Reader reader;
+  StringStream ss(content);
+  if (!reader.Parse(ss, handler)) {
     return Result::FAILED;
   }
+
+  if (0 == handler.filledFields_) {
+    return Result::FAILED;
+  }
+
+  it->second = std::move(tmpLocation);
 
   return Result::SUCCESS;
 }
 
-Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
+Result Storage::addVisit(const char* content)
 {
   using namespace rapidjson;
-
-  tbb::spin_rw_mutex::scoped_lock userLock;
-  int32_t userId = -1;
-  User *user = nullptr;
-  if (jsonVal.HasMember("user")) {
-    const Value& val = jsonVal["user"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    userId = val.GetInt();
-    tbb::spin_rw_mutex::scoped_lock usersLock(usersGuard_, true);
-    auto userIt = users_.find(userId);
-    if (users_.end() == userIt) {
-      return Result::NOT_FOUND;
-    }
-    user = &userIt->second;
-    userLock.acquire(user->guard_, true);
+  Visit visit;
+  VisitHandler handler(visit, usersGuard_, users_, locationsGuard_, locations_);
+  Reader reader;
+  StringStream ss(content);
+  if (!reader.Parse(ss, handler)) {
+    return handler.result_;
   }
 
-  tbb::spin_rw_mutex::scoped_lock locationLock;
-  int32_t locationId = -1;
-  Location *location = nullptr;
-  if (jsonVal.HasMember("location")) {
-    const Value& val = jsonVal["location"];
-    if (!val.IsInt()) {
-      return Result::FAILED;
-    }
-    locationId = val.GetInt();
-
-    tbb::spin_rw_mutex::scoped_lock locationsLock(locationsGuard_, true);
-    auto locationIt = locations_.find(locationId);
-    if (locations_.end() == locationIt) {
-      return Result::NOT_FOUND;
-    }
-    location = &locationIt->second;
-    locationLock.acquire(location->guard_, true);
+  if (handler.filledFields_ < 5) {
+    return Result::FAILED;
   }
+
+  tbb::spin_rw_mutex::scoped_lock visitsLock(visitsGuard_, true);
+  auto res = visits_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(handler.id_),
+    std::forward_as_tuple(std::move(visit)));
+  Visit* visitPtr = &res.first->second;
+
+  visit.user_->visits_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(handler.id_),
+    std::forward_as_tuple(visitPtr));
+
+  visit.location_->visits_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(handler.id_),
+    std::forward_as_tuple(visitPtr));
+
+  LOG(stderr, "New visit has been added\n");
+
+  return Result::SUCCESS;
+}
+
+Result Storage::updateVisit(const int32_t id, const char* content)
+{
+  using namespace rapidjson;
 
   tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, true);
   auto it = visits_.find(id);
@@ -539,84 +372,93 @@ Result Storage::updateVisit(const int32_t id, const rapidjson::Value& jsonVal)
   }
   tbb::spin_rw_mutex::scoped_lock visitLock(it->second.guard_, true);
   l.release();
-  if (!it->second.update(locationId, userId, jsonVal)) {
+
+  Visit tmpVisit(it->second);
+  VisitHandler handler(tmpVisit, usersGuard_, users_, locationsGuard_, locations_);
+  Reader reader;
+  StringStream ss(content);
+  if (!reader.Parse(ss, handler)) {
+    return handler.result_;
+  }
+
+  if (0 == handler.filledFields_) {
     return Result::FAILED;
   }
 
-  bool userChanged = false;
-  if (user && it->second.user_ != user) {
-    userChanged = true;
+  if (tmpVisit.user_ && it->second.user_ != tmpVisit.user_) {
     it->second.user_->visits_.erase(id);
-    it->second.user_ = user;
+    it->second.user_ = tmpVisit.user_;
     it->second.user_->visits_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(id),
       std::forward_as_tuple(&it->second));
   }
 
-  if (location && it->second.location_ != location) {
+  if (tmpVisit.location_ && it->second.location_ != tmpVisit.location_) {
     it->second.location_->visits_.erase(id);
-    it->second.location_ = location;
+    it->second.location_ = tmpVisit.location_;
     it->second.location_->visits_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(id),
       std::forward_as_tuple(&it->second));
   }
 
+  it->second = std::move(tmpVisit);
+
   return Result::SUCCESS;
 }
 
-Result Storage::getUser(std::string*& resp, const int32_t id)
+Result Storage::getUser(ConstBuffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
   if (users_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = it->second.getJson(id);
+  it->second.getJson(buffer, id);
   return Result::SUCCESS;
 }
 
-Result Storage::getLocation(std::string*& resp, const int32_t id)
+Result Storage::getLocation(ConstBuffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);
   if (locations_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = it->second.getJson(id);
+  it->second.getJson(buffer, id);
   return Result::SUCCESS;
 }
 
-Result Storage::getVisit(std::string*& resp, const int32_t id)
+Result Storage::getVisit(ConstBuffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, false);
   auto it = visits_.find(id);
   if (visits_.end() == it) {
     return Result::NOT_FOUND;
   }
-  resp = it->second.getJson(id);
+  it->second.getJson(buffer, id);
   return Result::SUCCESS;
 }
 
-Result Storage::getUserVisits(std::string& resp, const int32_t id, char* params, const int32_t paramsSize)
+Result Storage::getUserVisits(Buffer& buffer, const int32_t id, char* params, const int32_t paramsSize)
 {
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
   if (users_.end() == it) {
     return Result::NOT_FOUND;
   }
-  return it->second.getJsonVisits(resp, params, paramsSize);
+  return it->second.getJsonVisits(buffer, params, paramsSize);
 }
 
-Result Storage::getLocationAvgScore(std::string& resp, const int32_t id, char* params, const int32_t paramsSize)
+Result Storage::getLocationAvgScore(Buffer& buffer, const int32_t id, char* params, const int32_t paramsSize)
 {
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);
   if (locations_.end() == it) {
     return Result::NOT_FOUND;
   }
-  return it->second.getJsonAvgScore(resp, params, paramsSize);
+  return it->second.getJsonAvgScore(buffer, params, paramsSize);
 }
 
 } // namespace db

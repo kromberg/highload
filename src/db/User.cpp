@@ -9,6 +9,9 @@
 
 namespace db
 {
+User::User()
+{}
+
 User::User(
   std::string&& _email,
   std::string&& _first_name,
@@ -49,85 +52,31 @@ User& User::operator=(User&& user)
   last_name = std::move(user.last_name);
   birth_date = std::move(user.birth_date);
   gender = std::move(user.gender);
-  cache_.clear();
+  bufferSize_ = 0;
   return *this;
 }
 
 void User::cache(const int32_t id)
 {
-  cache_.reserve(75 + 10 + email.size() + first_name.size() + last_name.size() + 10 + 1 + 16);
-  cache_.clear();
-  cache_ += "{";
-  cache_ += "\"id\":" + std::to_string(id) + ",";
-  cache_ += "\"email\":\"" + email + "\",";
-  cache_ += "\"first_name\":\"" + first_name + "\",";
-  cache_ += "\"last_name\":\"" + last_name + "\",";
-  cache_ += "\"birth_date\":" + std::to_string(birth_date) + ",";
-  cache_ += "\"gender\":\"" + std::string(1, gender) + "\"";
-  cache_ += "}";
+  int size =
+    snprintf(buffer_ + DB_RESPONSE_200_SIZE, sizeof(buffer_) - DB_RESPONSE_200_SIZE,
+      "{\"id\":%d,\"email\":\"%s\",\"first_name\":\"%s\",\"last_name\":\"%s\",\"birth_date\":%d,\"gender\":\"%c\"}",
+      id, email.c_str(), first_name.c_str(), last_name.c_str(), birth_date, gender);
+  bufferSize_ = snprintf(buffer_, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+  buffer_[bufferSize_ - 1] = '\n';
+  bufferSize_ += size;
 }
 
-bool User::update(const rapidjson::Value& jsonVal)
+void User::getJson(ConstBuffer& buffer, const int32_t id)
 {
-  using namespace rapidjson;
-  User tmp(*this);
-  if (jsonVal.HasMember("email")) {
-    const Value& val = jsonVal["email"];
-    if (!val.IsString()) {
-      return false;
-    }
-    tmp.email = std::string(val.GetString());
+  if (0 == bufferSize_) {
+    cache(id);
   }
-
-  if (jsonVal.HasMember("first_name")) {
-    const Value& val = jsonVal["first_name"];
-    if (!val.IsString()) {
-      return false;
-    }
-    tmp.first_name = std::string(val.GetString());
-  }
-
-  if (jsonVal.HasMember("last_name")) {
-    const Value& val = jsonVal["last_name"];
-    if (!val.IsString()) {
-      return false;
-    }
-    tmp.last_name = std::string(val.GetString());
-  }
-
-  if (jsonVal.HasMember("birth_date")) {
-    const Value& val = jsonVal["birth_date"];
-    if (!val.IsInt()) {
-      return false;
-    }
-    tmp.birth_date = val.GetInt();
-  }
-
-  if (jsonVal.HasMember("gender")) {
-    const Value& val = jsonVal["gender"];
-    if (!val.IsString()) {
-      return false;
-    }
-    tmp.gender = *val.GetString();
-    if (tmp.gender != 'f' && tmp.gender != 'm') {
-      return false;
-    }
-  }
-
-  *this = std::move(tmp);
-
-  return true;
-}
-std::string* User::getJson(const int32_t id)
-{
-  if (!cache_.empty()) {
-    return &cache_;
-  }
-  cache(id);
-  return &cache_;
+  buffer.buffer = buffer_;
+  buffer.size = bufferSize_;
 }
 
-Result User::getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const
+Result User::getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSize) const
 {
   struct Parameters
   {
@@ -136,16 +85,9 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
     int32_t toDistance = std::numeric_limits<int32_t>::max();
     bool valid(const Visit& visit) const
     {
-      bool res = ((visit.visited_at > date.first) && (visit.visited_at < date.second) &&
+      return ((visit.visited_at > date.first) && (visit.visited_at < date.second) &&
               (country.empty() || (country == visit.location_->country)) &&
               (visit.location_->distance < toDistance));
-      LOG(stderr, "\n");
-      visit.dump();
-      dump();
-      LOG(stderr, "%s\n", res ? "PASSED" : "FAILED");
-      LOG(stderr, "\n");
-      
-      return res;
     }
     void dump() const
     {
@@ -188,8 +130,6 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
       }
     } while (next);
   }
-  requestParameter.dump();
-
 
   std::multimap<int32_t, Visit*> visits;
   for (const auto& visit : visits_) {
@@ -200,23 +140,26 @@ Result User::getJsonVisits(std::string& result, char* params, const int32_t para
         std::forward_as_tuple(visit.second));
     }
   }
+  int offset = DB_RESPONSE_200_SIZE;
+  int size = 0;
 
-  result.reserve(512);
-  result.clear();
-  result += "{";
-  result += "\"visits\":[";
+  size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "{\"visits\":[");
+  offset += size;
+
   for (auto visit : visits) {
-    result += "{";
-    result += "\"mark\":" + std::to_string(visit.second->mark) + ",";
-    result += "\"visited_at\":" + std::to_string(visit.second->visited_at) + ",";
-    result += "\"place\":\"" + visit.second->location_->place + "\"";
-    result += "},";
+    size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "{\"mark\":%d,\"visited_at\":%d,\"place\":\"%s\"},",
+      visit.second->mark, visit.second->visited_at, visit.second->location_->place.c_str());
+    offset += size;
   }
   if (!visits.empty()) {
-    result.pop_back();
+    -- offset;
   }
-  result += "]";
-  result += "}";
+  size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "]}");
+  offset += size;
+
+  buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, offset - DB_RESPONSE_200_SIZE);
+  buffer.buffer[buffer.size - 1] = '\n';
+  buffer.size += offset;
   return Result::SUCCESS;
 }
 

@@ -16,33 +16,57 @@
 
 namespace http
 {
-static const char* RESPONSE_200 = 
+static const char* RESPONSE_200[2] = 
+{
   "HTTP/1.1 200 OK\n"
   "Content-Type: application/json; charset=UTF-8\n"
   "Connection: close\n"
   "Content-Length: 2\n"
   "\n"
-  "{}";
-#define RESPONSE_200_SIZE 101
+  "{}",
+  "HTTP/1.1 200 OK\n"
+  "Content-Type: application/json; charset=UTF-8\n"
+  "Connection: keep-alive\n"
+  "Content-Length: 2\n"
+  "\n"
+  "{}",
+};
+static const size_t RESPONSE_200_SIZE[] = { 101, 106 };
 
-static const char* RESPONSE_400 = 
+static const char* RESPONSE_400[2] = 
+{
   "HTTP/1.1 400 Bad Request\n"
   "Content-Type: application/json; charset=UTF-8\n"
   "Connection: close\n"
   "Content-Length: 2\n"
   "\n"
-  "{}";
+  "{}",
+  "HTTP/1.1 400 Bad Request\n"
+  "Content-Type: application/json; charset=UTF-8\n"
+  "Connection: keep-alive\n"
+  "Content-Length: 2\n"
+  "\n"
+  "{}"
+};
 
-#define RESPONSE_400_SIZE 110
+static const size_t RESPONSE_400_SIZE[] = { 110, 115 };
 
-static const char* RESPONSE_404 = 
+static const char* RESPONSE_404[2] = 
+{
   "HTTP/1.1 404 Not Found\n"
   "Content-Type: application/json; charset=UTF-8\n"
   "Connection: close\n"
   "Content-Length: 2\n"
   "\n"
-  "{}";
-#define RESPONSE_404_SIZE 108
+  "{}",
+  "HTTP/1.1 404 Not Found\n"
+  "Content-Type: application/json; charset=UTF-8\n"
+  "Connection: keep-alive\n"
+  "Content-Length: 2\n"
+  "\n"
+  "{}"
+};
+static const size_t RESPONSE_404_SIZE[] = { 108, 113 };
 
 #define RESPONSE_200_PART1 \
   "HTTP/1.1 200 OK\n"\
@@ -50,6 +74,12 @@ static const char* RESPONSE_404 =
   "Connection: close\n"\
   "Content-Length: "
 #define RESPONSE_200_PART1_SIZE 96
+#define RESPONSE_200_PART1_KEEPALIVE \
+  "HTTP/1.1 200 OK\n"\
+  "Content-Type: application/json; charset=UTF-8\n"\
+  "Connection: keep-alive\n"\
+  "Content-Length: "
+#define RESPONSE_200_PART1_KEEPALIVE_SIZE 101
 
 #define RESPONSE_200_PART2 \
   "%zu\n"\
@@ -224,40 +254,46 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
 void HttpServer::handleRequest(tcp::SocketWrapper sock)
 {
   tcp::Socket _sock(sock);
-  Request req;
-  HTTPCode code;
-  {
-    //START_PROFILER("readRequest");
-    code = readRequest(req, _sock);
-    //STOP_PROFILER;
-  }
-  if (HTTPCode::OK != code) {
-    sendResponse(_sock, code);
-    return ;
-  }
 
-  StateMachine::Handler handler = StateMachine::getHandler(req);
-  if (!handler) {
-    sendResponse(_sock, code);
-    return ;
-  }
+  bool keepalive = false;
+  do {
+    Request req;
+    HTTPCode code;
+    {
+      code = readRequest(req, _sock);
+    }
+    if (HTTPCode::NO_ERROR == code) {
+      return;
+    }
+    keepalive = req.keepalive_;
+    if (HTTPCode::OK != code) {
+      sendResponse(_sock, code, keepalive);
+      continue;
+    }
 
-  Response resp;
-  {
-    //START_PROFILER("handler");
-    code = handler(resp, *storage_, req);
-    //STOP_PROFILER;
-  }
-  if (HTTPCode::OK != code) {
-    sendResponse(_sock, code);
-    return ;
-  }
+    StateMachine::Handler handler = StateMachine::getHandler(req);
+    if (!handler) {
+      sendResponse(_sock, code, keepalive);
+      continue;
+    }
 
-  if (Type::POST == req.type_) {
-    sendResponse(_sock, HTTPCode::OK);
-  } else {
-    sendResponse(_sock, *resp.body);
-  }
+    Response resp;
+    {
+      START_PROFILER("handler");
+      code = handler(resp, *storage_, req);
+      STOP_PROFILER;
+    }
+    if (HTTPCode::OK != code) {
+      sendResponse(_sock, code, keepalive);
+      continue;
+    }
+
+    if (Type::POST == req.type_) {
+      sendResponse(_sock, HTTPCode::OK, keepalive);
+    } else {
+      sendResponse(_sock, resp, keepalive);
+    }
+  } while (keepalive);
 }
 
 HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
@@ -267,15 +303,21 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
     METHOD,
     HEADERS,
     BODY,
-    END,
   } state = State::METHOD;
-  HTTPCode code;
-  thread_local char buffer[8 * 1024];
+  HTTPCode code = HTTPCode::NO_ERROR;
+  thread_local char buffer[4 * 1024];
   int offset = 0, size = 0;
   int res;
   do {
     res = sock.recv(buffer + size, sizeof(buffer) - size);
-    if (res) {
+    LOG(stderr, "res = %d\n", res);
+    if (-1 == res) {
+      if (EAGAIN == errno || EWOULDBLOCK == errno) {
+        res = 0;
+        continue;
+      }
+    }
+    if (res > 0) {
       size += res;
       buffer[size] = '\0';
       LOG(stderr, "Received buffer %s\n", buffer);
@@ -283,9 +325,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
         if (size - offset < req.contentLength_) {
           continue;
         }
-        if (req.json_.Parse(buffer + offset).HasParseError()) {
-          return HTTPCode::BAD_REQ;
-        }
+        req.content_ = buffer + offset;
         return HTTPCode::OK;
       }
       char* next = strchr(buffer + offset, '\n');
@@ -294,12 +334,15 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
         switch (state) {
           case State::METHOD:
           {
+            START_PROFILER("parseRequestMethod");
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
+            STOP_PROFILER;
             if (HTTPCode::OK != code) {
               LOG(stderr, "Method : %s. Code : %d\n", buffer + offset, code);
               return code;
             }
             if (Type::GET == req.type_) {
+              req.keepalive_ = true;
               return HTTPCode::OK;
             }
             state = State::HEADERS;
@@ -307,8 +350,10 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
           }
           case State::HEADERS:
           {
+            START_PROFILER("parseHeader");
             bool hasNext;
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
+            STOP_PROFILER;
             if (HTTPCode::OK != code) {
               LOG(stderr, "Header : %s. Code : %d\n", buffer + offset, code);
               return code;
@@ -326,11 +371,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
           if (size - offset < req.contentLength_) {
             break;
           }
-          state = State::END;
-          if (req.json_.Parse(buffer + offset).HasParseError()) {
-            LOG(stderr, "Could not parse body : %s. Code : %d\n\n", buffer + offset, HTTPCode::BAD_REQ);
-            return HTTPCode::BAD_REQ;
-          }
+          req.content_ = buffer + offset;
           return HTTPCode::OK;
         }
         next = strchr(buffer + offset, '\n');
@@ -340,10 +381,11 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
   return code;
 }
 
-void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code)
+void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool keepalive)
 {
   //int* outPipe = outPipes_[threadIdx_.fetch_add(1) % THREADS_COUNT];
 
+  size_t idx = keepalive ? 1 : 0;
   switch (code) {
     case HTTPCode::OK:
     {
@@ -361,7 +403,7 @@ void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code)
       }
       LOG(stderr, "200: %zd bytes have been spliced\n", res);
       */
-      send(sock, RESPONSE_200, RESPONSE_200_SIZE);
+      send(sock, RESPONSE_200[idx], RESPONSE_200_SIZE[idx]);
       break;
     }
     case HTTPCode::BAD_REQ:
@@ -380,7 +422,7 @@ void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code)
       }
       LOG(stderr, "400: %zd bytes have been spliced\n", res);
       */
-      send(sock, RESPONSE_400, RESPONSE_400_SIZE);
+      send(sock, RESPONSE_400[idx], RESPONSE_400_SIZE[idx]);
       break;
     }
     case HTTPCode::NOT_FOUND:
@@ -400,16 +442,25 @@ void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code)
       }
       LOG(stderr, "404: %zd bytes have been spliced\n", res);
       */
-      send(sock, RESPONSE_404, RESPONSE_404_SIZE);
+      send(sock, RESPONSE_404[idx], RESPONSE_404_SIZE[idx]);
       break;
     }
+    default:
+      break;
   }
 }
 
-void HttpServer::sendResponse(tcp::SocketWrapper sock, const std::string& body)
+void HttpServer::sendResponse(tcp::SocketWrapper sock, const Response& resp, bool keepalive)
 {
-  char buffer[8 * 1024];
-  int size = snprintf(buffer, sizeof(buffer), RESPONSE_200_PART1 RESPONSE_200_PART2 "%s", body.size(), body.c_str());
+  const char* buffer;
+  int size;
+  if (resp.buffer.size != 0) {
+    buffer = resp.buffer.buffer;
+    size = resp.buffer.size;
+  } else {
+    buffer = resp.constBuffer.buffer;
+    size = resp.constBuffer.size;
+  }
   send(sock, buffer, size);
 }
 
@@ -453,6 +504,8 @@ void HttpServer::send(tcp::SocketWrapper sock, const char* buffer, int size)
 
 Result HttpServer::doStart()
 {
+  return Result::SUCCESS;
+#if 0
   pipe2(pipe200_, O_NONBLOCK);
   pipe2(pipe400_, O_NONBLOCK);
   pipe2(pipe404_, O_NONBLOCK);
@@ -486,6 +539,7 @@ Result HttpServer::doStart()
   }
 
   return Result::SUCCESS;
+#endif
 }
 
 void HttpServer::acceptSocket(tcp::SocketWrapper sock)
