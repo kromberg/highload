@@ -34,7 +34,7 @@ User::User(
   last_name = std::string(jsonVal["last_name"].GetString());
   birth_date = jsonVal["birth_date"].GetInt();
   gender = *jsonVal["gender"].GetString();
-  cache(id);
+  //cache(id);
 }
 
 User::User(const User& user):
@@ -52,11 +52,11 @@ User& User::operator=(User&& user)
   last_name = std::move(user.last_name);
   birth_date = std::move(user.birth_date);
   gender = std::move(user.gender);
-  bufferSize_ = 0;
+  //bufferSize_ = 0;
   return *this;
 }
 
-void User::cache(const int32_t id)
+/*void User::cache(const int32_t id)
 {
   int size =
     snprintf(buffer_ + DB_RESPONSE_200_SIZE, sizeof(buffer_) - DB_RESPONSE_200_SIZE,
@@ -65,15 +65,17 @@ void User::cache(const int32_t id)
   bufferSize_ = snprintf(buffer_, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
   buffer_[bufferSize_ - 1] = '\n';
   bufferSize_ += size;
-}
+}*/
 
-void User::getJson(ConstBuffer& buffer, const int32_t id)
+void User::getJson(Buffer& buffer, const int32_t id)
 {
-  if (0 == bufferSize_) {
-    cache(id);
-  }
-  buffer.buffer = buffer_;
-  buffer.size = bufferSize_;
+  int size =
+    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, sizeof(buffer.capacity) - DB_RESPONSE_200_SIZE,
+      "{\"id\":%d,\"email\":\"%s\",\"first_name\":\"%s\",\"last_name\":\"%s\",\"birth_date\":%d,\"gender\":\"%c\"}",
+      id, email.c_str(), first_name.c_str(), last_name.c_str(), birth_date, gender);
+  buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+  buffer.buffer[buffer.size - 1] = '\n';
+  buffer.size += size;
 }
 
 Result User::getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSize) const

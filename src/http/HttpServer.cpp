@@ -8,6 +8,7 @@
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/epoll.h>
 
 #include <common/Profiler.h>
 
@@ -87,8 +88,8 @@ static const size_t RESPONSE_404_SIZE[] = { 108, 113 };
 
 HttpServer::HttpServer(db::StoragePtr& storage):
   tcp::TcpServer(),
-  storage_(storage),
-  threadPool_(THREADS_COUNT, std::bind(&HttpServer::handleRequest, this, std::placeholders::_1))
+  storage_(storage)
+  // threadPool_(THREADS_COUNT, std::bind(&HttpServer::handleRequest, this, std::placeholders::_1))
 {}
 
 HttpServer::~HttpServer()
@@ -251,49 +252,46 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
   return HTTPCode::OK;
 }
 
-void HttpServer::handleRequest(tcp::SocketWrapper sock)
+bool HttpServer::handleRequest(tcp::SocketWrapper sock)
 {
-  tcp::Socket _sock(sock);
+  Request req;
+  HTTPCode code;
+  {
+    code = readRequest(req, sock);
+  }
+  bool keepalive = req.keepalive_;
+  if (HTTPCode::NO_ERROR == code) {
+    return keepalive;
+  }
+  if (HTTPCode::OK != code) {
+    sendResponse(sock, code, keepalive);
+    return keepalive;
+  }
 
-  bool keepalive = false;
-  do {
-    Request req;
-    HTTPCode code;
-    {
-      code = readRequest(req, _sock);
-    }
-    if (HTTPCode::NO_ERROR == code) {
-      return;
-    }
-    keepalive = req.keepalive_;
-    if (HTTPCode::OK != code) {
-      sendResponse(_sock, code, keepalive);
-      continue;
-    }
+  StateMachine::Handler handler = StateMachine::getHandler(req);
+  if (!handler) {
+    sendResponse(sock, code, keepalive);
+    return keepalive;
+  }
 
-    StateMachine::Handler handler = StateMachine::getHandler(req);
-    if (!handler) {
-      sendResponse(_sock, code, keepalive);
-      continue;
-    }
+  Response resp;
+  {
+    START_PROFILER("handler");
+    code = handler(resp, *storage_, req);
+    STOP_PROFILER;
+  }
+  if (HTTPCode::OK != code) {
+    sendResponse(sock, code, keepalive);
+    return keepalive;
+  }
 
-    Response resp;
-    {
-      START_PROFILER("handler");
-      code = handler(resp, *storage_, req);
-      STOP_PROFILER;
-    }
-    if (HTTPCode::OK != code) {
-      sendResponse(_sock, code, keepalive);
-      continue;
-    }
+  if (Type::POST == req.type_) {
+    sendResponse(sock, HTTPCode::OK, keepalive);
+  } else {
+    sendResponse(sock, resp, keepalive);
+  }
 
-    if (Type::POST == req.type_) {
-      sendResponse(_sock, HTTPCode::OK, keepalive);
-    } else {
-      sendResponse(_sock, resp, keepalive);
-    }
-  } while (keepalive);
+  return keepalive;
 }
 
 HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
@@ -342,7 +340,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
               return code;
             }
             if (Type::GET == req.type_) {
-              req.keepalive_ = true;
+              //req.keepalive_ = true;
               return HTTPCode::OK;
             }
             state = State::HEADERS;
@@ -502,8 +500,56 @@ void HttpServer::send(tcp::SocketWrapper sock, const char* buffer, int size)
   }
 }
 
+void HttpServer::eventsThreadFunc()
+{
+  static constexpr int MAX_EVENTS = 20;
+  struct epoll_event ev, events[MAX_EVENTS];
+  int nfds;
+
+  do {
+    nfds = epoll_wait(epollFd_, events, MAX_EVENTS, -1);
+    for (int i = 0; i < nfds; ++i) {
+      if (events[i].data.fd == int(sock_)) {
+        tcp::SocketWrapper sock = sock_.accept();
+        if (-1 == int(sock)) {
+          continue;
+        }
+        ev.events = EPOLLIN | EPOLLET;
+        ev.data.fd = int(sock);
+        if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock), &ev)) {
+          continue;
+        }
+      } else {
+        if ((events[i].events & EPOLLERR) ||
+            (events[i].events & EPOLLHUP))
+        {
+          close(events[i].data.fd);
+          continue;
+        }
+        if (!handleRequest(tcp::SocketWrapper(events[i].data.fd))) {
+          close(events[i].data.fd);
+        }
+      }
+    }
+  } while (running_ && -1 != nfds);
+}
+
 Result HttpServer::doStart()
 {
+  epollFd_ = epoll_create(32);
+  if (-1 == epollFd_) {
+    return Result::FAILED;
+  }
+  struct epoll_event ev;
+  ev.events = EPOLLIN;
+  ev.data.fd = int(sock_);
+  if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock_), &ev)) {
+    return Result::FAILED;
+  }
+
+  std::thread tmpThread(&HttpServer::eventsThreadFunc, this);
+  eventsThread_ = std::move(tmpThread);
+
   return Result::SUCCESS;
 #if 0
   pipe2(pipe200_, O_NONBLOCK);
@@ -542,6 +588,18 @@ Result HttpServer::doStart()
 #endif
 }
 
+Result HttpServer::doStop()
+{
+  if (eventsThread_.joinable()) {
+    running_ = false;
+    close(epollFd_);
+    eventsThread_.join();
+    eventsThread_ = std::thread();
+    sock_.close();
+  }
+  return Result::SUCCESS;
+}
+
 void HttpServer::acceptSocket(tcp::SocketWrapper sock)
 {
   int flags = fcntl(int(sock), F_GETFL, 0);
@@ -555,7 +613,9 @@ void HttpServer::acceptSocket(tcp::SocketWrapper sock)
     return ;
   }
 
-  threadPool_.run(sock);
+  handleRequest(sock);
+
+  //threadPool_.run(sock);
 }
 
 } // namespace http

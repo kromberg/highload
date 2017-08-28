@@ -408,7 +408,7 @@ Result Storage::updateVisit(const int32_t id, const char* content)
   return Result::SUCCESS;
 }
 
-Result Storage::getUser(ConstBuffer& buffer, const int32_t id)
+Result Storage::getUser(Buffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
@@ -419,7 +419,7 @@ Result Storage::getUser(ConstBuffer& buffer, const int32_t id)
   return Result::SUCCESS;
 }
 
-Result Storage::getLocation(ConstBuffer& buffer, const int32_t id)
+Result Storage::getLocation(Buffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);
@@ -430,7 +430,7 @@ Result Storage::getLocation(ConstBuffer& buffer, const int32_t id)
   return Result::SUCCESS;
 }
 
-Result Storage::getVisit(ConstBuffer& buffer, const int32_t id)
+Result Storage::getVisit(Buffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, false);
   auto it = visits_.find(id);

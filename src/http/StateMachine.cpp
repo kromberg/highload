@@ -150,7 +150,7 @@ HTTPCode StateMachine::updateVisit(Response& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::getUser(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getUser(resp.constBuffer, req.id_);
+  Result res = storage.getUser(resp.buffer, req.id_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -162,7 +162,7 @@ HTTPCode StateMachine::getUser(Response& resp, db::Storage& storage, Request& re
 
 HTTPCode StateMachine::getLocation(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getLocation(resp.constBuffer, req.id_);
+  Result res = storage.getLocation(resp.buffer, req.id_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -174,7 +174,7 @@ HTTPCode StateMachine::getLocation(Response& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::getVisit(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getVisit(resp.constBuffer, req.id_);
+  Result res = storage.getVisit(resp.buffer, req.id_);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {

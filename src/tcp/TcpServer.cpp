@@ -36,14 +36,14 @@ Result TcpServer::start(const uint16_t port)
     return Result::FAILED;
   }
 
-  /*{
+  {
     int one = 1;
     int res = sock_.setsockopt(SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &one, sizeof(one));
     if (0 != res) {
       LOG_CRITICAL(stderr, "Cannot set SO_REUSEADDR | SO_REUSEPORT on socket, errno = %s(%d)\n", std::strerror(errno), errno);
       return Result::FAILED;
     }
-  }*/
+  }
   res = sock_.bind(port);
   if (res < 0)
   {
@@ -99,21 +99,21 @@ Result TcpServer::start(const uint16_t port)
     }
   }
 
-  std::thread tmpThread(&TcpServer::acceptFunc, this);
-  acceptThread_ = std::move(tmpThread);
+  //std::thread tmpThread(&TcpServer::acceptFunc, this);
+  //acceptThread_ = std::move(tmpThread);
 
   return doStart();
 }
 
 Result TcpServer::stop()
 {
-  if (acceptThread_.joinable()) {
+  /*if (acceptThread_.joinable()) {
     sock_.shutdown();
     acceptThread_.join();
     acceptThread_ = std::thread();
     sock_.close();
-  }
-  return Result::SUCCESS;
+  }*/
+  return doStop();
 }
 
 } // namespace tcp

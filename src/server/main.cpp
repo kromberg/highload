@@ -1,6 +1,6 @@
 #include <memory>
 #include <cstdint>
-#include <iostream>
+#include <vector>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,10 +30,20 @@ int main(int argc, char* argv[])
   storage->load("/tmp/data/data.zip");
   db::Storage::loadTime("/tmp/data/options.txt");
 
-  http::HttpServer server(storage);
-  Result res = server.start();
-  if (Result::SUCCESS == res) {
-    running = true;
+  LOG_CRITICAL(stderr, "sizeof(tbb::spin_rw_mutex) = %lu\n", sizeof(tbb::spin_rw_mutex));
+  LOG_CRITICAL(stderr, "sizeof(db::User) = %lu\n", sizeof(db::User));
+  LOG_CRITICAL(stderr, "sizeof(db::Location) = %lu\n", sizeof(db::Location));
+  LOG_CRITICAL(stderr, "sizeof(db::Visit) = %lu\n", sizeof(db::Visit));
+
+  running = true;
+  std::vector<http::HttpServer*> servers(4, nullptr);
+  for (auto server : servers) {
+    server = new http::HttpServer(storage);
+    Result res = server->start();
+    if (Result::SUCCESS != res) {
+      running = false;
+      break;
+    }
   }
 
   while (running) {
@@ -41,7 +51,12 @@ int main(int argc, char* argv[])
     common::TimeProfiler::print();
   }
 
-  server.stop();
+  for (auto server : servers) {
+    if (server) {
+      server->stop();
+      delete server;
+    }
+  }
 
   return 0;
 }

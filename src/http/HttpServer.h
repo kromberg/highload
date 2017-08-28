@@ -18,9 +18,14 @@ using common::Result;
 class HttpServer : public tcp::TcpServer
 {
 private:
-  static constexpr size_t THREADS_COUNT = 3;
+  static constexpr size_t THREADS_COUNT = 4;
   db::StoragePtr storage_;
-  ThreadPool threadPool_;
+
+  std::thread eventsThread_;
+  volatile bool running_ = true;
+  int epollFd_;
+
+  //ThreadPool threadPool_;
 
 #if 0
   int pipe200_[2];
@@ -31,7 +36,8 @@ private:
 #endif
 
 private:
-  void handleRequest(tcp::SocketWrapper sock);
+  void eventsThreadFunc();
+  bool handleRequest(tcp::SocketWrapper sock);
   virtual void acceptSocket(tcp::SocketWrapper sock) override;
 
   HTTPCode parseURL(Request& req, char* url, int32_t size);
@@ -45,6 +51,7 @@ private:
   void write(int fd, const char* buffer, int32_t size);
 
   virtual Result doStart() override;
+  virtual Result doStop() override;
 public:
   HttpServer(db::StoragePtr& storage);
   ~HttpServer();

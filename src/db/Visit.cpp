@@ -23,7 +23,7 @@ Visit::Visit(
 {
   visited_at = jsonVal["visited_at"].GetInt();
   mark = jsonVal["mark"].GetInt();
-  cache(id);
+  //cache(id);
 }
 
 Visit::Visit(const Visit& visit):
@@ -43,11 +43,11 @@ Visit& Visit::operator=(Visit&& visit)
   mark = std::move(visit.mark);
   location_ = std::move(visit.location_);
   user_ = std::move(visit.user_);
-  bufferSize_ = 0;
+  //bufferSize_ = 0;
   return *this;
 }
 
-void Visit::cache(const int32_t id)
+/*void Visit::cache(const int32_t id)
 {
   int size =
     snprintf(buffer_ + DB_RESPONSE_200_SIZE, sizeof(buffer_) - DB_RESPONSE_200_SIZE,
@@ -56,15 +56,17 @@ void Visit::cache(const int32_t id)
   bufferSize_ = snprintf(buffer_, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
   buffer_[bufferSize_ - 1] = '\n';
   bufferSize_ += size;
-}
+}*/
 
-void Visit::getJson(ConstBuffer& buffer, const int32_t id)
+void Visit::getJson(Buffer& buffer, const int32_t id)
 {
-  if (0 == bufferSize_) {
-    cache(id);
-  }
-  buffer.buffer = buffer_;
-  buffer.size = bufferSize_;
+  int size =
+    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, sizeof(buffer.capacity) - DB_RESPONSE_200_SIZE,
+      "{\"id\":%d,\"location\":%d,\"user\":%d,\"visited_at\":%d,\"mark\":%u}",
+      id, location, user, visited_at, mark);
+  buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+  buffer.buffer[buffer.size - 1] = '\n';
+  buffer.size += size;
 }
 
 void Visit::dump() const

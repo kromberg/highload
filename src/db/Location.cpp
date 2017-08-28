@@ -33,7 +33,7 @@ Location::Location(
   country = std::string(jsonVal["country"].GetString());
   city = std::string(jsonVal["city"].GetString());
   distance = jsonVal["distance"].GetInt();
-  cache(id);
+  //cache(id);
 }
 
 Location::Location(const Location& location):
@@ -49,11 +49,11 @@ Location& Location::operator=(Location&& location)
   country = std::move(location.country);
   city = std::move(location.city);
   distance = std::move(location.distance);
-  bufferSize_ = 0;
+  //bufferSize_ = 0;
   return *this;
 }
 
-void Location::cache(const int32_t id)
+/*void Location::cache(const int32_t id)
 {
   int size =
     snprintf(buffer_ + DB_RESPONSE_200_SIZE, sizeof(buffer_) - DB_RESPONSE_200_SIZE,
@@ -62,15 +62,17 @@ void Location::cache(const int32_t id)
   bufferSize_ = snprintf(buffer_, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
   buffer_[bufferSize_ - 1] = '\n';
   bufferSize_ += size;
-}
+}*/
 
-void Location::getJson(ConstBuffer& buffer, const int32_t id)
+void Location::getJson(Buffer& buffer, const int32_t id)
 {
-  if (0 == bufferSize_) {
-    cache(id);
-  }
-  buffer.buffer = buffer_;
-  buffer.size = bufferSize_;
+  int size =
+    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, sizeof(buffer.capacity) - DB_RESPONSE_200_SIZE,
+      "{\"id\":%d,\"place\":\"%s\",\"country\":\"%s\",\"city\":\"%s\",\"distance\":%d}",
+      id, place.c_str(), country.c_str(), city.c_str(), distance);
+  buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+  buffer.buffer[buffer.size - 1] = '\n';
+  buffer.size += size;
 }
 
 static std::string to_string(const double val)

@@ -14,9 +14,9 @@ using common::Result;
 
 class TcpServer
 {
-private:
+protected:
   Socket sock_;
-  std::thread acceptThread_;
+  //std::thread acceptThread_;
 
 private:
   void acceptFunc();
@@ -24,6 +24,7 @@ private:
 
 protected:
   virtual Result doStart() { return Result::SUCCESS; }
+  virtual Result doStop() { return Result::SUCCESS; }
 public:
   TcpServer();
   virtual ~TcpServer();
