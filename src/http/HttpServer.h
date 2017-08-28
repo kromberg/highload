@@ -18,43 +18,41 @@ using common::Result;
 class HttpServer : public tcp::TcpServer
 {
 private:
-  static constexpr size_t THREADS_COUNT = 4;
   db::StoragePtr storage_;
 
   std::thread eventsThread_;
   volatile bool running_ = true;
   int epollFd_;
 
-  static constexpr size_t RESPONSES_POOL_SIZE = 256;
-  uint8_t currentResponseIdx_ = 0;
-  Response responses_[RESPONSES_POOL_SIZE];
+  struct Context
+  {
+    int fd;
+    bool keepalive;
+    Response resp;
+  };
 
-  //ThreadPool threadPool_;
+  static constexpr int MAX_EVENTS = 512;
+  static constexpr size_t CONTEXT_POOL_SIZE = 16 * MAX_EVENTS;
+  size_t currCtxIdx_ = 0;
+  Context ctx_[CONTEXT_POOL_SIZE];
 
-#if 0
-  int pipe200_[2];
-  int pipe400_[2];
-  int pipe404_[2];
-  int outPipes_[THREADS_COUNT][2];
-  //std::atomic<size_t> threadIdx_;
-#endif
+  Context listenCtx_;
 
 private:
   void eventsThreadFunc();
-  bool handleRequest(struct epoll_event& ev);
-  virtual void acceptSocket(tcp::SocketWrapper sock) override;
+  bool handleRequest(Context& ctx);
+  bool handleRequestResponse(Context& ctx);
 
   HTTPCode parseURL(Request& req, char* url, int32_t size);
   HTTPCode parseRequestMethod(Request& req, char* reqMethod, int32_t size);
   HTTPCode parseHeader(Request& req, bool& hasNext, char* header, int32_t size);
   HTTPCode readRequest(Request& req, tcp::SocketWrapper sock);
 
-  void setResponse(struct epoll_event& ev, Response& resp, const HTTPCode code);
-  void setResponse(struct epoll_event& ev, Response& resp);
+  void setResponse(Response& resp, const HTTPCode code, const bool keepalive);
 
-  void sendResponse(struct epoll_event& ev);
-  void sendResponse(struct epoll_event& ev, const Response& resp);
+  void sendResponse(Context& ctx);
   void sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool keepalive);
+  void sendResponse(tcp::SocketWrapper sock, const Response& resp);
   
   void send(tcp::SocketWrapper sock, const char* buffer, int32_t size);
   void write(int fd, const char* buffer, int32_t size);

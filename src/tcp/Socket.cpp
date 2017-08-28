@@ -83,6 +83,7 @@ int SocketWrapper::shutdown(int how)
 
 int SocketWrapper::close()
 {
+  START_PROFILER("close");
   int res = ::close(sock_);
   sock_ = -1;
   return res;

@@ -34,8 +34,6 @@ enum HTTPCode
 
 struct Response
 {
-  int fd = 0;
-  bool keepalive = false;
   db::ConstBuffer constBuffer;
   db::Buffer buffer;
   char arr[8 * 1024];
@@ -48,18 +46,18 @@ struct Response
 
 struct Request
 {
-  Type type_ = Type::NONE;
-  Table table1_ = Table::NONE;
-  Table table2_ = Table::NONE;
-  int32_t id_ = -1;
-  char* params_ = nullptr;
-  int32_t paramsSize_ = 0;
+  Type type = Type::NONE;
+  Table table1 = Table::NONE;
+  Table table2 = Table::NONE;
+  int32_t id = -1;
+  char* params = nullptr;
+  int32_t paramsSize = 0;
 
-  bool hasContentType_ = false;
-  int32_t contentLength_ = 0;
+  bool hasContentType = false;
+  int32_t contentLength = 0;
 
-  const char* content_ = nullptr;
-  bool keepalive_ = false;
+  const char* content = nullptr;
+  bool keepalive = false;
 };
 } // namespace http
 

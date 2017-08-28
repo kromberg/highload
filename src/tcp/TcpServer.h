@@ -16,11 +16,6 @@ class TcpServer
 {
 protected:
   Socket sock_;
-  //std::thread acceptThread_;
-
-private:
-  void acceptFunc();
-  virtual void acceptSocket(SocketWrapper sock) = 0;
 
 protected:
   virtual Result doStart() { return Result::SUCCESS; }

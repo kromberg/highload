@@ -16,7 +16,7 @@
 volatile bool running = false;
 void sig_handler(int signum)
 {
-  LOG(stderr, "Received signal %d\n", signum);
+  LOG_CRITICAL(stderr, "Received signal %d\n", signum);
   running = false;
 }
 

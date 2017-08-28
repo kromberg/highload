@@ -2,6 +2,7 @@
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <fcntl.h>
 
 #include "TcpServer.h"
 
@@ -14,17 +15,6 @@ TcpServer::TcpServer()
 TcpServer::~TcpServer()
 {
   stop();
-}
-
-void TcpServer::acceptFunc()
-{
-  SocketWrapper clientSock;
-  int rawSock;
-  do {
-    clientSock = sock_.accept();
-    rawSock = int(clientSock);
-    acceptSocket(clientSock);
-  } while (rawSock >= 0);
 }
 
 Result TcpServer::start(const uint16_t port)
@@ -76,17 +66,9 @@ Result TcpServer::start(const uint16_t port)
       return Result::FAILED;
     }
   }
-  {
-    int one = 1;
-    int res = sock_.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
-    if (0 != res) {
-      LOG_CRITICAL(stderr, "Cannot set TCP_QUICKACK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
-      return Result::FAILED;
-    }
-  }
 
   {
-    int bufferSize = 4 * 1024;
+    int bufferSize = 8 * 1024;
     int res = sock_.setsockopt(SOL_SOCKET, SO_SNDBUF, &bufferSize, sizeof(bufferSize));
     if (0 != res) {
       LOG_CRITICAL(stderr, "Cannot set SO_SNDBUF on socket, errno = %s(%d)\n", std::strerror(errno), errno);
@@ -99,20 +81,25 @@ Result TcpServer::start(const uint16_t port)
     }
   }
 
-  //std::thread tmpThread(&TcpServer::acceptFunc, this);
-  //acceptThread_ = std::move(tmpThread);
+  {
+    int flags = fcntl(int(sock_), F_GETFL, 0);
+    if (-1 == flags) {
+      LOG_CRITICAL(stderr, "Cannot get socket flags, errno = %s(%d)\n", std::strerror(errno), errno);
+      return Result::FAILED;
+    }
+
+    int res = fcntl(int(sock_), F_SETFL, flags | O_NONBLOCK);
+    if (-1 == res) {
+      LOG_CRITICAL(stderr, "Cannot set O_NONBLOCK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+      return Result::FAILED;
+    }
+  }
 
   return doStart();
 }
 
 Result TcpServer::stop()
 {
-  /*if (acceptThread_.joinable()) {
-    sock_.shutdown();
-    acceptThread_.join();
-    acceptThread_ = std::thread();
-    sock_.close();
-  }*/
   return doStop();
 }
 

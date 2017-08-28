@@ -3,7 +3,6 @@
 #include <fstream>
 
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
 
 #include <rapidjson/document.h>
@@ -146,6 +145,8 @@ Result Storage::load(const std::string& path)
         std::forward_as_tuple(id),
         std::forward_as_tuple(visit));
     });
+
+  LOG_CRITICAL(stderr, "All information was loaded from files\n");
 
   return Result::SUCCESS;
 }
@@ -355,8 +356,6 @@ Result Storage::addVisit(const char* content)
     std::piecewise_construct,
     std::forward_as_tuple(handler.id_),
     std::forward_as_tuple(visitPtr));
-
-  LOG(stderr, "New visit has been added\n");
 
   return Result::SUCCESS;
 }
