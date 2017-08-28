@@ -251,72 +251,72 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
   return HTTPCode::OK;
 }
 
-bool HttpServer::handleRequestResponse(Context& ctx)
+HttpServer::ConnectionStatus HttpServer::handleRequestResponse(tcp::SocketWrapper sock)
 {
-  tcp::SocketWrapper sock(ctx.fd);
-  Response& resp = ctx.resp;
-  resp.buffer.size = 0;
-  resp.constBuffer.size = 0;
   Request req;
   HTTPCode code = readRequest(req, sock);
-  ctx.keepalive = req.keepalive;
   if (HTTPCode::NO_ERROR == code) {
-    return ctx.keepalive;
+    return req.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
   }
   if (HTTPCode::OK != code) {
-    sendResponse(sock, code, ctx.keepalive);
-    return ctx.keepalive;
+    sendResponse(sock, code, req.keepalive);
+    return req.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
   }
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
-    sendResponse(sock, code, ctx.keepalive);
-    return ctx.keepalive;
+    sendResponse(sock, code, req.keepalive);
+    return req.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
   }
 
+  Response resp;
   {
     START_PROFILER("handler");
     code = handler(resp, *storage_, req);
     STOP_PROFILER;
   }
   if (HTTPCode::OK != code) {
-    sendResponse(sock, code, ctx.keepalive);
-    return ctx.keepalive;
+    sendResponse(sock, code, req.keepalive);
+    return req.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
   }
 
   if (Type::POST == req.type) {
     sendResponse(sock, HTTPCode::OK, false);
+    return ConnectionStatus::CLOSE_IMMEDIATE;
   } else {
     sendResponse(sock, resp);
   }
 
-  return ctx.keepalive;
+  return req.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
 }
 
-bool HttpServer::handleRequest(Context& ctx)
+bool HttpServer::handleRequest(tcp::SocketWrapper sock)
 {
-  tcp::SocketWrapper sock(ctx.fd);
-  Response& resp = ctx.resp;
-  resp.buffer.size = 0;
-  resp.constBuffer.size = 0;
-
   Request req;
   HTTPCode code = readRequest(req, sock);
-  ctx.keepalive = req.keepalive;
   if (HTTPCode::NO_ERROR == code) {
-    return ctx.keepalive;
+    return req.keepalive;
   }
+  SendContext& sndCtx = sendCtxes_[int(sock)];
+  sndCtx.keepalive = req.keepalive;
   if (HTTPCode::OK != code) {
-    setResponse(resp, code, ctx.keepalive);
+    setResponse(sndCtx, code);
+    sndCtx.status = sndCtx.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
     return true;
   }
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
-    setResponse(resp, code, ctx.keepalive);
+    setResponse(sndCtx, code);
+    sndCtx.status = sndCtx.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
     return true;
   }
 
+  Response resp;
+  char* buffer = bufferPool_[(currentBufferIdx_ ++) % BUFFERS_POOL_SIZE];
+  sndCtx.buffer.buffer = buffer;
+  resp.buffer.buffer = buffer;
+  resp.buffer.capacity = BUFFER_SIZE;
   {
     START_PROFILER("handler");
     code = handler(resp, *storage_, req);
@@ -324,12 +324,17 @@ bool HttpServer::handleRequest(Context& ctx)
   }
 
   if (HTTPCode::OK != code) {
-    setResponse(resp, code, ctx.keepalive);
+    setResponse(sndCtx, code);
+    sndCtx.status = sndCtx.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
     return true;
   }
 
   if (Type::POST == req.type) {
-    setResponse(resp, HTTPCode::OK, ctx.keepalive);
+    setResponse(sndCtx, HTTPCode::OK);
+    sndCtx.status = ConnectionStatus::CLOSE_IMMEDIATE;
+  } else {
+    setResponse(sndCtx, resp);
+    sndCtx.status = sndCtx.keepalive ? ConnectionStatus::OPEN : ConnectionStatus::CLOSE;
   }
 
   return true;
@@ -344,7 +349,7 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
     BODY,
   } state = State::METHOD;
   HTTPCode code = HTTPCode::NO_ERROR;
-  char buffer[8 * 1024];
+  char buffer[BUFFER_SIZE];
   int offset = 0, size = 0;
   int res;
   do {
@@ -352,10 +357,10 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
     if (res <= 0) {
       if (EAGAIN == errno || EWOULDBLOCK == errno) {
         req.keepalive = true;
-        break;
+        return HTTPCode::NO_ERROR;
       }
       req.keepalive = false;
-      break;
+      return HTTPCode::NO_ERROR;
     }
     if (res > 0) {
       size += res;
@@ -421,30 +426,41 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
   return code;
 }
 
-void HttpServer::setResponse(Response& resp, const HTTPCode code, const bool keepalive)
+void HttpServer::setResponse(SendContext& sndCtx, const HTTPCode code)
 {
-  size_t idx = keepalive ? 1 : 0;
+  size_t idx = sndCtx.keepalive ? 1 : 0;
   switch (code) {
     case HTTPCode::OK:
     {
-      resp.constBuffer.buffer = RESPONSE_200[idx];
-      resp.constBuffer.size = RESPONSE_200_SIZE[idx];
+      sndCtx.buffer.buffer = RESPONSE_200[idx];
+      sndCtx.buffer.size = RESPONSE_200_SIZE[idx];
       break;
     }
     case HTTPCode::BAD_REQ:
     {
-      resp.constBuffer.buffer = RESPONSE_400[idx];
-      resp.constBuffer.size = RESPONSE_400_SIZE[idx];
+      sndCtx.buffer.buffer = RESPONSE_400[idx];
+      sndCtx.buffer.size = RESPONSE_400_SIZE[idx];
       break;
     }
     case HTTPCode::NOT_FOUND:
     {
-      resp.constBuffer.buffer = RESPONSE_404[idx];
-      resp.constBuffer.size = RESPONSE_404_SIZE[idx];
+      sndCtx.buffer.buffer = RESPONSE_404[idx];
+      sndCtx.buffer.size = RESPONSE_404_SIZE[idx];
       break;
     }
     default:
       break;
+  }
+}
+
+void HttpServer::setResponse(SendContext& sndCtx, const Response& resp)
+{
+  if (resp.buffer.size != 0) {
+    sndCtx.buffer.buffer = resp.buffer.buffer;
+    sndCtx.buffer.size = resp.buffer.size;
+  } else {
+    sndCtx.buffer.buffer = resp.constBuffer.buffer;
+    sndCtx.buffer.size = resp.constBuffer.size;
   }
 }
 
@@ -472,23 +488,15 @@ void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool
   }
 }
 
-void HttpServer::sendResponse(Context& ctx)
+HttpServer::ConnectionStatus HttpServer::sendResponse(tcp::SocketWrapper sock)
 {
-  tcp::SocketWrapper sock(ctx.fd);
-  const char* buffer;
-  int size;
-  if (ctx.resp.buffer.size != 0) {
-    buffer = ctx.resp.buffer.buffer;
-    size = ctx.resp.buffer.size;
-  } else {
-    buffer = ctx.resp.constBuffer.buffer;
-    size = ctx.resp.constBuffer.size;
-  }
-  send(sock, buffer, size);
-  if (!ctx.keepalive) {
+  SendContext& sndCtx = sendCtxes_[int(sock)];
+  send(sock, sndCtx.buffer.buffer, sndCtx.buffer.size);
+  if (!sndCtx.keepalive) {
+    sock.shutdown();
     sock.close();
-    ctx.fd = 0;
   }
+  return sndCtx.status;
 }
 
 void HttpServer::sendResponse(tcp::SocketWrapper sock, const Response& resp)
@@ -552,11 +560,14 @@ void HttpServer::eventsThreadFunc()
   sigaddset(&sigset, SIGINT);
   sigaddset(&sigset, SIGTERM);
 
+  static constexpr size_t MAX_CLOSING_FDS = 100;
+  size_t closingFdIdx = 0;
+  std::array<int, MAX_CLOSING_FDS> closingFds;
+
   do {
     nfds = epoll_pwait(epollFd_, events, MAX_EVENTS, -1, &sigset);
     for (int i = 0; i < nfds; ++i) {
-      Context* ctx = static_cast<Context*>(events[i].data.ptr);
-      if (ctx->fd == int(sock_)) {
+      if (events[i].data.fd == int(sock_)) {
         tcp::SocketWrapper sock = sock_.accept();
         if (-1 == int(sock)) {
           continue;
@@ -575,38 +586,54 @@ void HttpServer::eventsThreadFunc()
           }
         }
 
-        Context& newCtx = ctx_[(++ currCtxIdx_) % CONTEXT_POOL_SIZE];
-        newCtx.fd = int(sock);
         ev.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR | EPOLLET;
-        ev.data.ptr = &newCtx;
+        ev.data.fd = int(sock);
         if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock), &ev)) {
           LOG_CRITICAL(stderr, "epoll_ctl error, errno = %s(%d)\n", std::strerror(errno), errno);
           continue;
         }
       } else {
-        tcp::SocketWrapper sock(ctx->fd);
+        tcp::SocketWrapper sock(events[i].data.fd);
         if ((events[i].events & EPOLLERR) ||
             (events[i].events & EPOLLHUP) ||
             (events[i].events & EPOLLRDHUP))
         {
-          sock.close();
-          ctx->fd = 0;
+          addClosingFd(int(sock), closingFds, closingFdIdx);
           continue;
         }
         bool in = (events[i].events & EPOLLIN);
         bool out = (events[i].events & EPOLLOUT);
         if (in && out) {
-          if (!handleRequestResponse(*ctx)) {
-            sock.close();
-            ctx->fd = 0;
+          ConnectionStatus status = handleRequestResponse(sock);
+          switch (status) {
+            case ConnectionStatus::OPEN:
+              break;
+            case ConnectionStatus::CLOSE_IMMEDIATE:
+              sock.shutdown();
+              sock.close();
+              break;
+            case ConnectionStatus::CLOSE:
+              addClosingFd(int(sock), closingFds, closingFdIdx);
+              break;
           }
         } else if (in) {
-          if (!handleRequest(*ctx)) {
+          if (!handleRequest(sock)) {
+            sock.shutdown();
             sock.close();
-            ctx->fd = 0;
           }
         } else if (out) {
-          sendResponse(*ctx);
+          ConnectionStatus status = sendResponse(sock);
+          switch (status) {
+            case ConnectionStatus::OPEN:
+              break;
+            case ConnectionStatus::CLOSE_IMMEDIATE:
+              sock.shutdown();
+              sock.close();
+              break;
+            case ConnectionStatus::CLOSE:
+              addClosingFd(int(sock), closingFds, closingFdIdx);
+              break;
+          }
         }
       }
     }
@@ -621,8 +648,7 @@ Result HttpServer::doStart()
   }
   struct epoll_event ev;
   ev.events = EPOLLIN | EPOLLET;
-  listenCtx_.fd = int(sock_);
-  ev.data.ptr = &listenCtx_;
+  ev.data.fd = int(sock_);
   if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock_), &ev)) {
     return Result::FAILED;
   }

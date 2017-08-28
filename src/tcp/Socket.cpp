@@ -71,6 +71,7 @@ int SocketWrapper::listen(int backlog)
 
 SocketWrapper SocketWrapper::accept()
 {
+  START_PROFILER("accept");
   struct sockaddr_in addr = {0};
   socklen_t addrLen = sizeof(addr);
   return ::accept(sock_, (struct sockaddr *) &addr, &addrLen);
@@ -78,6 +79,7 @@ SocketWrapper SocketWrapper::accept()
 
 int SocketWrapper::shutdown(int how)
 {
+  START_PROFILER("shutdown");
   return ::shutdown(sock_, how);
 }
 

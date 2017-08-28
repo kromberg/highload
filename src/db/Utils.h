@@ -1,6 +1,8 @@
 #ifndef _DB_UTILS_H_
 #define _DB_UTILS_H_
 
+#include <common/Types.h>
+
 namespace db
 {
 
@@ -21,18 +23,8 @@ namespace db
   "\n"
 #define DB_RESPONSE_200_SIZE 108
 
-struct ConstBuffer
-{
-  const char* buffer = nullptr;
-  int size = 0;
-};
-
-struct Buffer
-{
-  char* buffer = nullptr;
-  int capacity = 0;
-  int size = 0;
-};
+using common::ConstBuffer;
+using common::Buffer;
 
 inline void uriDecode(std::string& res, char* str, int32_t size)
 {

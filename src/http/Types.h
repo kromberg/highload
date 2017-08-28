@@ -3,7 +3,7 @@
 
 #include <rapidjson/document.h>
 
-#include <db/Utils.h>
+#include <common/Types.h>
 
 namespace http
 {
@@ -14,6 +14,7 @@ enum class Type
   GET,
   MAX,
 };
+
 enum class Table
 {
   NONE = 0,
@@ -32,10 +33,13 @@ enum HTTPCode
   NOT_FOUND = 404,
 };
 
+using common::ConstBuffer;
+using common::Buffer;
+
 struct Response
 {
-  db::ConstBuffer constBuffer;
-  db::Buffer buffer;
+  ConstBuffer constBuffer;
+  Buffer buffer;
   char arr[8 * 1024];
   Response()
   {

@@ -1,7 +1,7 @@
 #ifndef _HTTP_SERVER_H
 #define _HTTP_SERVER_H
 
-#include <atomic>
+#include <array>
 
 #include <db/Storage.h>
 #include <tcp/TcpServer.h>
@@ -24,33 +24,45 @@ private:
   volatile bool running_ = true;
   int epollFd_;
 
-  struct Context
+  static constexpr int MAX_EVENTS = 4 * 1024;
+  static constexpr size_t BUFFERS_POOL_SIZE = 1024;
+  static constexpr size_t BUFFER_SIZE = 4 * 1024;
+  static constexpr size_t FD_COUNT = 65536;
+  size_t currentBufferIdx_ = 0;
+  char bufferPool_[BUFFERS_POOL_SIZE][BUFFER_SIZE];
+  enum class ConnectionStatus
   {
-    int fd;
-    bool keepalive;
-    Response resp;
+    OPEN,
+    CLOSE_IMMEDIATE,
+    CLOSE,
   };
-
-  static constexpr int MAX_EVENTS = 512;
-  static constexpr size_t CONTEXT_POOL_SIZE = 16 * MAX_EVENTS;
-  size_t currCtxIdx_ = 0;
-  Context ctx_[CONTEXT_POOL_SIZE];
-
-  Context listenCtx_;
+  struct SendContext
+  {
+    bool keepalive;
+    ConnectionStatus status;
+    ConstBuffer buffer;
+  };
+  SendContext sendCtxes_[FD_COUNT];
 
 private:
+  template<size_t N>
+  void addClosingFd(int fd, std::array<int, N>& fds, size_t& idx);
+  template<size_t N>
+  void closeFds(std::array<int, N> fds);
+
   void eventsThreadFunc();
-  bool handleRequest(Context& ctx);
-  bool handleRequestResponse(Context& ctx);
+  bool handleRequest(tcp::SocketWrapper sock);
+  ConnectionStatus handleRequestResponse(tcp::SocketWrapper sock);
 
   HTTPCode parseURL(Request& req, char* url, int32_t size);
   HTTPCode parseRequestMethod(Request& req, char* reqMethod, int32_t size);
   HTTPCode parseHeader(Request& req, bool& hasNext, char* header, int32_t size);
   HTTPCode readRequest(Request& req, tcp::SocketWrapper sock);
 
-  void setResponse(Response& resp, const HTTPCode code, const bool keepalive);
+  void setResponse(SendContext& sndCtx, const HTTPCode code);
+  void setResponse(SendContext& sndCtx, const Response& resp);
 
-  void sendResponse(Context& ctx);
+  ConnectionStatus sendResponse(tcp::SocketWrapper sock);
   void sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool keepalive);
   void sendResponse(tcp::SocketWrapper sock, const Response& resp);
   
@@ -63,6 +75,26 @@ public:
   HttpServer(db::StoragePtr& storage);
   ~HttpServer();
 };
+
+template<size_t N>
+void HttpServer::addClosingFd(int fd, std::array<int, N>& fds, size_t& idx)
+{
+  fds[idx ++] = fd;
+  if (idx >= fds.size()) {
+    idx = 0;
+    std::thread{&HttpServer::closeFds<N>, this, fds}.detach();
+  }
+}
+
+template<size_t N>
+void HttpServer::closeFds(std::array<int, N> fds)
+{
+  for (int fd : fds) {
+    tcp::SocketWrapper sock(fd);
+    sock.shutdown();
+    sock.close();
+  }
+}
 } // namespace http
 
 #endif // _HTTP_SERVER_H

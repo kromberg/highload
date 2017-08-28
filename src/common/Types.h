@@ -9,6 +9,20 @@ enum class Result
   FAILED,
   NOT_FOUND,
 };
+
+struct ConstBuffer
+{
+  const char* buffer = nullptr;
+  int size = 0;
+};
+
+struct Buffer
+{
+  char* buffer = nullptr;
+  int capacity = 0;
+  int size = 0;
+};
+
 } // namespace common
 
 #ifndef NDEBUG
