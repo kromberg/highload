@@ -252,46 +252,47 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
   return HTTPCode::OK;
 }
 
-bool HttpServer::handleRequest(tcp::SocketWrapper sock)
+bool HttpServer::handleRequest(struct epoll_event& ev)
 {
+  tcp::SocketWrapper sock(ev.data.fd);
   Request req;
-  HTTPCode code;
-  {
-    code = readRequest(req, sock);
-  }
-  bool keepalive = req.keepalive_;
+  HTTPCode code = readRequest(req, sock);
+  Response& resp = responses_[++ currentResponseIdx_];
+  resp.keepalive = req.keepalive_;
+  resp.buffer.size = 0;
+  resp.constBuffer.size = 0;
+
   if (HTTPCode::NO_ERROR == code) {
-    return keepalive;
+    return resp.keepalive;
   }
   if (HTTPCode::OK != code) {
-    sendResponse(sock, code, keepalive);
-    return keepalive;
+    setResponse(ev, resp, code);
+    return true;
   }
 
   StateMachine::Handler handler = StateMachine::getHandler(req);
   if (!handler) {
-    sendResponse(sock, code, keepalive);
-    return keepalive;
+    setResponse(ev, resp, code);
+    return true;
   }
 
-  Response resp;
   {
     START_PROFILER("handler");
     code = handler(resp, *storage_, req);
     STOP_PROFILER;
   }
   if (HTTPCode::OK != code) {
-    sendResponse(sock, code, keepalive);
-    return keepalive;
+    setResponse(ev, resp, code);
+    return true;
   }
 
   if (Type::POST == req.type_) {
-    sendResponse(sock, HTTPCode::OK, keepalive);
+    setResponse(ev, resp, HTTPCode::OK);
   } else {
-    sendResponse(sock, resp, keepalive);
+    setResponse(ev, resp);
   }
 
-  return keepalive;
+  return true;
 }
 
 HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
@@ -379,6 +380,48 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
   return code;
 }
 
+void HttpServer::setResponse(struct epoll_event& ev, Response& resp, const HTTPCode code)
+{
+  size_t idx = resp.keepalive ? 1 : 0;
+  switch (code) {
+    case HTTPCode::OK:
+    {
+      resp.constBuffer.buffer = RESPONSE_200[idx];
+      resp.constBuffer.size = RESPONSE_200_SIZE[idx];
+      break;
+    }
+    case HTTPCode::BAD_REQ:
+    {
+      resp.constBuffer.buffer = RESPONSE_400[idx];
+      resp.constBuffer.size = RESPONSE_400_SIZE[idx];
+      break;
+    }
+    case HTTPCode::NOT_FOUND:
+    {
+      resp.constBuffer.buffer = RESPONSE_404[idx];
+      resp.constBuffer.size = RESPONSE_404_SIZE[idx];
+      break;
+    }
+    default:
+      break;
+  }
+
+  setResponse(ev, resp);
+}
+
+void HttpServer::setResponse(struct epoll_event& ev, Response& resp)
+{
+  START_PROFILER("epoll_ctl_out");
+  ev.events = EPOLLOUT;
+  resp.fd = ev.data.fd;
+  ev.data.ptr = &resp;
+  int res = epoll_ctl(epollFd_, EPOLL_CTL_MOD, resp.fd, &ev);
+  if (-1 == res) {
+    LOG_CRITICAL(stderr, "Cannot modify epoll fd to EPOLLOUT, errno = %s(%d)\n", std::strerror(errno), errno);
+    close(resp.fd);
+  }
+}
+
 void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool keepalive)
 {
   //int* outPipe = outPipes_[threadIdx_.fetch_add(1) % THREADS_COUNT];
@@ -448,7 +491,17 @@ void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool
   }
 }
 
-void HttpServer::sendResponse(tcp::SocketWrapper sock, const Response& resp, bool keepalive)
+void HttpServer::sendResponse(struct epoll_event& ev)
+{
+  if (!ev.data.ptr) {
+    return ;
+  }
+  Response* resp = static_cast<Response*>(ev.data.ptr);
+
+  sendResponse(ev, *resp);
+}
+
+void HttpServer::sendResponse(struct epoll_event& ev, const Response& resp)
 {
   const char* buffer;
   int size;
@@ -459,7 +512,19 @@ void HttpServer::sendResponse(tcp::SocketWrapper sock, const Response& resp, boo
     buffer = resp.constBuffer.buffer;
     size = resp.constBuffer.size;
   }
-  send(sock, buffer, size);
+  send(tcp::SocketWrapper(resp.fd), buffer, size);
+  if (resp.keepalive) {
+    START_PROFILER("epoll_ctl_in");
+    ev.events = EPOLLIN;
+    ev.data.fd = resp.fd;
+    int res = epoll_ctl(epollFd_, EPOLL_CTL_MOD, ev.data.fd, &ev);
+    if (-1 == res) {
+      LOG_CRITICAL(stderr, "Cannot modify epoll fd to EPOLLIN, errno = %s(%d)\n", std::strerror(errno), errno);
+      close(resp.fd);
+    }
+  } else {
+    close(resp.fd);
+  }
 }
 
 void HttpServer::write(int fd, const char* buffer, int size)
@@ -502,7 +567,7 @@ void HttpServer::send(tcp::SocketWrapper sock, const char* buffer, int size)
 
 void HttpServer::eventsThreadFunc()
 {
-  static constexpr int MAX_EVENTS = 20;
+  static constexpr int MAX_EVENTS = 10;
   struct epoll_event ev, events[MAX_EVENTS];
   int nfds;
 
@@ -514,7 +579,7 @@ void HttpServer::eventsThreadFunc()
         if (-1 == int(sock)) {
           continue;
         }
-        ev.events = EPOLLIN | EPOLLET;
+        ev.events = EPOLLIN;
         ev.data.fd = int(sock);
         if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock), &ev)) {
           continue;
@@ -526,8 +591,12 @@ void HttpServer::eventsThreadFunc()
           close(events[i].data.fd);
           continue;
         }
-        if (!handleRequest(tcp::SocketWrapper(events[i].data.fd))) {
-          close(events[i].data.fd);
+        if (events[i].events & EPOLLIN) {
+          if (!handleRequest(events[i])) {
+            close(events[i].data.fd);
+          }
+        } else if (events[i].events & EPOLLOUT) {
+          sendResponse(events[i]);
         }
       }
     }
@@ -613,7 +682,7 @@ void HttpServer::acceptSocket(tcp::SocketWrapper sock)
     return ;
   }
 
-  handleRequest(sock);
+  //handleRequest(sock);
 
   //threadPool_.run(sock);
 }

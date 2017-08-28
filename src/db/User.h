@@ -44,6 +44,7 @@ struct User
     const int32_t id,
     const rapidjson::Value& jsonVal);
   User(const User& user);
+  User(User&& user);
   User& operator=(User&& user);
   void getJson(Buffer& buffer, const int32_t id);
   Result getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSize) const;

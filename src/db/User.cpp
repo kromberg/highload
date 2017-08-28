@@ -45,6 +45,14 @@ User::User(const User& user):
   gender(user.gender)
 {}
 
+User::User(User&& user):
+  email(std::move(user.email)),
+  first_name(std::move(user.first_name)),
+  last_name(std::move(user.last_name)),
+  birth_date(std::move(user.birth_date)),
+  gender(std::move(user.gender))
+{}
+
 User& User::operator=(User&& user)
 {
   email = std::move(user.email);
@@ -70,7 +78,7 @@ User& User::operator=(User&& user)
 void User::getJson(Buffer& buffer, const int32_t id)
 {
   int size =
-    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, sizeof(buffer.capacity) - DB_RESPONSE_200_SIZE,
+    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, buffer.capacity - DB_RESPONSE_200_SIZE,
       "{\"id\":%d,\"email\":\"%s\",\"first_name\":\"%s\",\"last_name\":\"%s\",\"birth_date\":%d,\"gender\":\"%c\"}",
       id, email.c_str(), first_name.c_str(), last_name.c_str(), birth_date, gender);
   buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);

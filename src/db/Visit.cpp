@@ -61,7 +61,7 @@ Visit& Visit::operator=(Visit&& visit)
 void Visit::getJson(Buffer& buffer, const int32_t id)
 {
   int size =
-    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, sizeof(buffer.capacity) - DB_RESPONSE_200_SIZE,
+    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, buffer.capacity - DB_RESPONSE_200_SIZE,
       "{\"id\":%d,\"location\":%d,\"user\":%d,\"visited_at\":%d,\"mark\":%u}",
       id, location, user, visited_at, mark);
   buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);

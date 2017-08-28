@@ -67,7 +67,7 @@ Location& Location::operator=(Location&& location)
 void Location::getJson(Buffer& buffer, const int32_t id)
 {
   int size =
-    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, sizeof(buffer.capacity) - DB_RESPONSE_200_SIZE,
+    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, buffer.capacity - DB_RESPONSE_200_SIZE,
       "{\"id\":%d,\"place\":\"%s\",\"country\":\"%s\",\"city\":\"%s\",\"distance\":%d}",
       id, place.c_str(), country.c_str(), city.c_str(), distance);
   buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);

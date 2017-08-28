@@ -25,6 +25,10 @@ private:
   volatile bool running_ = true;
   int epollFd_;
 
+  static constexpr size_t RESPONSES_POOL_SIZE = 256;
+  uint8_t currentResponseIdx_ = 0;
+  Response responses_[RESPONSES_POOL_SIZE];
+
   //ThreadPool threadPool_;
 
 #if 0
@@ -37,7 +41,7 @@ private:
 
 private:
   void eventsThreadFunc();
-  bool handleRequest(tcp::SocketWrapper sock);
+  bool handleRequest(struct epoll_event& ev);
   virtual void acceptSocket(tcp::SocketWrapper sock) override;
 
   HTTPCode parseURL(Request& req, char* url, int32_t size);
@@ -45,8 +49,13 @@ private:
   HTTPCode parseHeader(Request& req, bool& hasNext, char* header, int32_t size);
   HTTPCode readRequest(Request& req, tcp::SocketWrapper sock);
 
+  void setResponse(struct epoll_event& ev, Response& resp, const HTTPCode code);
+  void setResponse(struct epoll_event& ev, Response& resp);
+
+  void sendResponse(struct epoll_event& ev);
+  void sendResponse(struct epoll_event& ev, const Response& resp);
   void sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool keepalive);
-  void sendResponse(tcp::SocketWrapper sock, const Response& resp, bool keepalive);
+  
   void send(tcp::SocketWrapper sock, const char* buffer, int32_t size);
   void write(int fd, const char* buffer, int32_t size);
 

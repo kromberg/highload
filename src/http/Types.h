@@ -34,6 +34,8 @@ enum HTTPCode
 
 struct Response
 {
+  int fd = 0;
+  bool keepalive = false;
   db::ConstBuffer constBuffer;
   db::Buffer buffer;
   char arr[8 * 1024];
