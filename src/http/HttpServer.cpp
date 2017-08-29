@@ -253,6 +253,10 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
 
 HttpServer::ConnectionStatus HttpServer::handleRequestResponse(tcp::SocketWrapper sock)
 {
+  {
+    START_PROFILER("handleRequestResponse");
+  }
+
   Request req;
   HTTPCode code = readRequest(req, sock);
   if (HTTPCode::NO_ERROR == code) {
@@ -292,6 +296,9 @@ HttpServer::ConnectionStatus HttpServer::handleRequestResponse(tcp::SocketWrappe
 
 bool HttpServer::handleRequest(tcp::SocketWrapper sock)
 {
+  {
+    START_PROFILER("handleRequest");
+  }
   Request req;
   HTTPCode code = readRequest(req, sock);
   if (HTTPCode::NO_ERROR == code) {
@@ -490,12 +497,20 @@ void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool
 
 HttpServer::ConnectionStatus HttpServer::sendResponse(tcp::SocketWrapper sock)
 {
+  {
+    START_PROFILER("sendResponse");
+  }
   SendContext& sndCtx = sendCtxes_[int(sock)];
+  if (!sndCtx.buffer.buffer) {
+    return ConnectionStatus::OPEN;
+  }
   send(sock, sndCtx.buffer.buffer, sndCtx.buffer.size);
   if (!sndCtx.keepalive) {
     sock.shutdown();
     sock.close();
   }
+  sndCtx.buffer.buffer = nullptr;
+  sndCtx.buffer.size = 0;
   return sndCtx.status;
 }
 
@@ -556,16 +571,18 @@ void HttpServer::eventsThreadFunc()
   struct epoll_event ev, events[MAX_EVENTS];
   int nfds;
 
-  sigset_t sigset;
-  sigaddset(&sigset, SIGINT);
-  sigaddset(&sigset, SIGTERM);
-
+  static constexpr size_t CLOSING_ITERATION = 100;
   static constexpr size_t MAX_CLOSING_FDS = 100;
   size_t closingFdIdx = 0;
   std::array<int, MAX_CLOSING_FDS> closingFds;
+  size_t iteration = 0;
 
   do {
-    nfds = epoll_pwait(epollFd_, events, MAX_EVENTS, -1, &sigset);
+    if (++ iteration % CLOSING_ITERATION == 0) {
+      closeFds(closingFds, closingFdIdx);
+      closingFdIdx = 0;
+    }
+    nfds = epoll_wait(epollFd_, events, MAX_EVENTS, -1, "epoll_events");
     for (int i = 0; i < nfds; ++i) {
       if (events[i].data.fd == int(sock_)) {
         tcp::SocketWrapper sock = sock_.accept();
@@ -591,6 +608,18 @@ void HttpServer::eventsThreadFunc()
         if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock), &ev)) {
           LOG_CRITICAL(stderr, "epoll_ctl error, errno = %s(%d)\n", std::strerror(errno), errno);
           continue;
+        }
+        ConnectionStatus status = handleRequestResponse(sock);
+        switch (status) {
+          case ConnectionStatus::OPEN:
+            break;
+          case ConnectionStatus::CLOSE_IMMEDIATE:
+            sock.shutdown();
+            sock.close();
+            break;
+          case ConnectionStatus::CLOSE:
+            addClosingFd(int(sock), closingFds, closingFdIdx);
+            break;
         }
       } else {
         tcp::SocketWrapper sock(events[i].data.fd);
@@ -637,7 +666,7 @@ void HttpServer::eventsThreadFunc()
         }
       }
     }
-  } while (running_ && -1 != nfds);
+  } while (running_ && nfds >= 0);
 }
 
 Result HttpServer::doStart()
@@ -663,10 +692,10 @@ Result HttpServer::doStop()
 {
   if (eventsThread_.joinable()) {
     running_ = false;
+    sock_.close();
     close(epollFd_);
     eventsThread_.join();
     eventsThread_ = std::thread();
-    sock_.close();
   }
   return Result::SUCCESS;
 }

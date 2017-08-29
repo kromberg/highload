@@ -26,12 +26,17 @@ int main(int argc, char* argv[])
   signal(SIGINT, sig_handler);
   signal(SIGTERM, sig_handler);
 
+  size_t serversCount = 4;
+  if (argc >= 2) {
+    serversCount = std::stoul(argv[1]);
+  }
+
   db::StoragePtr storage(new db::Storage);
   storage->load("/tmp/data/data.zip");
   db::Storage::loadTime("/tmp/data/options.txt");
 
   running = true;
-  std::vector<http::HttpServer*> servers(4, nullptr);
+  std::vector<http::HttpServer*> servers(serversCount, nullptr);
   for (auto server : servers) {
     server = new http::HttpServer(storage);
     Result res = server->start();

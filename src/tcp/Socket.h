@@ -21,7 +21,7 @@ public:
   SocketWrapper& operator=(SocketWrapper&& rhs);
   int create();
   int bind(const uint16_t port = 80);
-  int listen(int backlog = 5);
+  int listen(int backlog = 128);
   SocketWrapper accept();
   int shutdown(int how = SHUT_RDWR);
   int close();

@@ -3,6 +3,11 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <fcntl.h>
+#include <sys/epoll.h>
+#include <signal.h>
+#include <unistd.h>
+
+#include <common/Profiler.h>
 
 #include "TcpServer.h"
 
@@ -34,21 +39,7 @@ Result TcpServer::start(const uint16_t port)
       return Result::FAILED;
     }
   }
-  res = sock_.bind(port);
-  if (res < 0)
-  {
-    LOG_CRITICAL(stderr, "Cannot bind server socket %d. errno = %d(%s)\n",
-      int(sock_), errno, std::strerror(errno));
-    return Result::FAILED;
-  }
 
-  res = sock_.listen();
-  if (res < 0)
-  {
-    LOG_CRITICAL(stderr, "Cannot bind server socket. errno = %d(%s)\n",
-      errno, std::strerror(errno));
-    return Result::FAILED;
-  }
   {
     int one = 1;
     int res = sock_.setsockopt(IPPROTO_TCP, TCP_DEFER_ACCEPT, &one, sizeof(one));
@@ -87,12 +78,27 @@ Result TcpServer::start(const uint16_t port)
       LOG_CRITICAL(stderr, "Cannot get socket flags, errno = %s(%d)\n", std::strerror(errno), errno);
       return Result::FAILED;
     }
-
     int res = fcntl(int(sock_), F_SETFL, flags | O_NONBLOCK);
     if (-1 == res) {
       LOG_CRITICAL(stderr, "Cannot set O_NONBLOCK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
       return Result::FAILED;
     }
+  }
+
+  res = sock_.bind(port);
+  if (res < 0)
+  {
+    LOG_CRITICAL(stderr, "Cannot bind server socket %d. errno = %d(%s)\n",
+      int(sock_), errno, std::strerror(errno));
+    return Result::FAILED;
+  }
+
+  res = sock_.listen(65536);
+  if (res < 0)
+  {
+    LOG_CRITICAL(stderr, "Cannot bind server socket. errno = %d(%s)\n",
+      errno, std::strerror(errno));
+    return Result::FAILED;
   }
 
   return doStart();
@@ -101,6 +107,30 @@ Result TcpServer::start(const uint16_t port)
 Result TcpServer::stop()
 {
   return doStop();
+}
+
+int TcpServer::epoll_create(int size)
+{
+  START_PROFILER("epoll_create");
+  return ::epoll_create(size);
+}
+
+int TcpServer::epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout, const std::string& profiler)
+{
+  START_PROFILER(profiler);
+  return ::epoll_wait(epfd, events, maxevents, timeout);
+}
+
+int TcpServer::epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask)
+{
+  START_PROFILER("epoll_pwait");
+  return ::epoll_pwait(epfd, events, maxevents, timeout, sigmask);
+}
+
+int TcpServer::epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
+{
+  START_PROFILER("epoll_ctl");
+  return ::epoll_ctl(epfd, op, fd, event);
 }
 
 } // namespace tcp

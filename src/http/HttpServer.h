@@ -24,7 +24,7 @@ private:
   volatile bool running_ = true;
   int epollFd_;
 
-  static constexpr int MAX_EVENTS = 4 * 1024;
+  static constexpr int MAX_EVENTS = 32;
   static constexpr size_t BUFFERS_POOL_SIZE = 1024;
   static constexpr size_t BUFFER_SIZE = 4 * 1024;
   static constexpr size_t FD_COUNT = 65536;
@@ -48,7 +48,7 @@ private:
   template<size_t N>
   void addClosingFd(int fd, std::array<int, N>& fds, size_t& idx);
   template<size_t N>
-  void closeFds(std::array<int, N> fds);
+  void closeFds(std::array<int, N> fds, const size_t size);
 
   void eventsThreadFunc();
   bool handleRequest(tcp::SocketWrapper sock);
@@ -81,16 +81,16 @@ void HttpServer::addClosingFd(int fd, std::array<int, N>& fds, size_t& idx)
 {
   fds[idx ++] = fd;
   if (idx >= fds.size()) {
+    std::thread{&HttpServer::closeFds<N>, this, fds, idx}.detach();
     idx = 0;
-    std::thread{&HttpServer::closeFds<N>, this, fds}.detach();
   }
 }
 
 template<size_t N>
-void HttpServer::closeFds(std::array<int, N> fds)
+void HttpServer::closeFds(std::array<int, N> fds, const size_t size)
 {
-  for (int fd : fds) {
-    tcp::SocketWrapper sock(fd);
+  for (size_t i = 0; i < size; ++i) {
+    tcp::SocketWrapper sock(fds[i]);
     sock.shutdown();
     sock.close();
   }

@@ -55,10 +55,13 @@ public:
 
   static void print()
   {
+#ifdef PROFILER
     tbb::spin_rw_mutex::scoped_lock l(guard_, false);
+    LOG_CRITICAL(stderr, "\n\n");
     for (const auto& op : operations_) {
-      LOG_CRITICAL(stderr, "%20s -> %10lu calls %20lu nsecs\n", op.first.c_str(), op.second.callsCount, op.second.timeNsec);
+      LOG_CRITICAL(stderr, "%20s -> %10lu calls %15lu nsecs %10lu nsecs/call\n", op.first.c_str(), op.second.callsCount, op.second.timeNsec, op.second.timeNsec / op.second.callsCount);
     }
+#endif
   }
 };
 

@@ -60,20 +60,8 @@ User& User::operator=(User&& user)
   last_name = std::move(user.last_name);
   birth_date = std::move(user.birth_date);
   gender = std::move(user.gender);
-  //bufferSize_ = 0;
   return *this;
 }
-
-/*void User::cache(const int32_t id)
-{
-  int size =
-    snprintf(buffer_ + DB_RESPONSE_200_SIZE, sizeof(buffer_) - DB_RESPONSE_200_SIZE,
-      "{\"id\":%d,\"email\":\"%s\",\"first_name\":\"%s\",\"last_name\":\"%s\",\"birth_date\":%d,\"gender\":\"%c\"}",
-      id, email.c_str(), first_name.c_str(), last_name.c_str(), birth_date, gender);
-  bufferSize_ = snprintf(buffer_, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
-  buffer_[bufferSize_ - 1] = '\n';
-  bufferSize_ += size;
-}*/
 
 void User::getJson(Buffer& buffer, const int32_t id)
 {
