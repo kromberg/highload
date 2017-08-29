@@ -27,7 +27,6 @@ enum class Table
 
 enum HTTPCode
 {
-  NO_ERROR = 0,
   OK = 200,
   BAD_REQ = 400,
   NOT_FOUND = 404,

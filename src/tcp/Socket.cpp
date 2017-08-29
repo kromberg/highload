@@ -77,6 +77,14 @@ SocketWrapper SocketWrapper::accept()
   return ::accept(sock_, (struct sockaddr *) &addr, &addrLen);
 }
 
+SocketWrapper SocketWrapper::accept4(int flags)
+{
+  START_PROFILER("accept4");
+  struct sockaddr_in addr = {0};
+  socklen_t addrLen = sizeof(addr);
+  return ::accept4(sock_, (struct sockaddr *) &addr, &addrLen, flags);
+}
+
 int SocketWrapper::shutdown(int how)
 {
   START_PROFILER("shutdown");

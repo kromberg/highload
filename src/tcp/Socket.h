@@ -23,6 +23,7 @@ public:
   int bind(const uint16_t port = 80);
   int listen(int backlog = 128);
   SocketWrapper accept();
+  SocketWrapper accept4(int flags);
   int shutdown(int how = SHUT_RDWR);
   int close();
   operator int() { return sock_; }
