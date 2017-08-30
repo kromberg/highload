@@ -40,14 +40,14 @@ Result TcpServer::start(const uint16_t port)
     }
   }
 
-  {
+  /*{
     int one = 1;
     int res = sock_.setsockopt(IPPROTO_TCP, TCP_DEFER_ACCEPT, &one, sizeof(one));
     if (0 != res) {
       LOG_CRITICAL(stderr, "Cannot set TCP_DEFER_ACCEPT on socket, errno = %s(%d)\n", std::strerror(errno), errno);
       return Result::FAILED;
     }
-  }
+  }*/
 
   {
     int one = 1;
@@ -59,7 +59,16 @@ Result TcpServer::start(const uint16_t port)
   }
 
   {
-    int bufferSize = 8 * 1024;
+    int one = 1;
+    int res = sock_.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
+    if (0 != res) {
+      LOG_CRITICAL(stderr, "Cannot set TCP_QUICKACK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+      return Result::FAILED;
+    }
+  }
+
+  {
+    int bufferSize = 64 * 1024;
     int res = sock_.setsockopt(SOL_SOCKET, SO_SNDBUF, &bufferSize, sizeof(bufferSize));
     if (0 != res) {
       LOG_CRITICAL(stderr, "Cannot set SO_SNDBUF on socket, errno = %s(%d)\n", std::strerror(errno), errno);
@@ -93,7 +102,7 @@ Result TcpServer::start(const uint16_t port)
     return Result::FAILED;
   }
 
-  res = sock_.listen(65536);
+  res = sock_.listen(128);
   if (res < 0)
   {
     LOG_CRITICAL(stderr, "Cannot bind server socket. errno = %d(%s)\n",
@@ -115,9 +124,9 @@ int TcpServer::epoll_create(int size)
   return ::epoll_create(size);
 }
 
-int TcpServer::epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout, const std::string& profiler)
+int TcpServer::epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 {
-  START_PROFILER(profiler);
+  START_PROFILER("epoll_wait");
   return ::epoll_wait(epfd, events, maxevents, timeout);
 }
 

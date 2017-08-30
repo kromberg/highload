@@ -72,17 +72,13 @@ int SocketWrapper::listen(int backlog)
 SocketWrapper SocketWrapper::accept()
 {
   START_PROFILER("accept");
-  struct sockaddr_in addr = {0};
-  socklen_t addrLen = sizeof(addr);
-  return ::accept(sock_, (struct sockaddr *) &addr, &addrLen);
+  return ::accept(sock_, nullptr, nullptr);
 }
 
 SocketWrapper SocketWrapper::accept4(int flags)
 {
   START_PROFILER("accept4");
-  struct sockaddr_in addr = {0};
-  socklen_t addrLen = sizeof(addr);
-  return ::accept4(sock_, (struct sockaddr *) &addr, &addrLen, flags);
+  return ::accept4(sock_, nullptr, nullptr, flags);
 }
 
 int SocketWrapper::shutdown(int how)
@@ -101,13 +97,13 @@ int SocketWrapper::close()
 
 int SocketWrapper::send(const char* buffer, size_t size, int flags)
 {
-  START_PROFILER("send");
+  //START_PROFILER("send");
   return ::send(sock_, buffer, size, flags);
 }
 
 int SocketWrapper::recv(char* buffer, size_t size, int flags)
 {
-  START_PROFILER("recv");
+  //START_PROFILER("recv");
   return ::recv(sock_, buffer, size, flags);
 }
 

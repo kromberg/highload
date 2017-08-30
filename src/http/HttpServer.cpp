@@ -273,9 +273,8 @@ Result HttpServer::handleRequest(tcp::SocketWrapper sock)
 
   Response resp;
   {
-    START_PROFILER("handler");
+    //START_PROFILER("handler");
     code = handler(resp, *storage_, req);
-    STOP_PROFILER;
   }
   if (HTTPCode::OK != code) {
     sendResponse(sock, code, req.keepalive);
@@ -314,7 +313,7 @@ std::pair<Result, HTTPCode> HttpServer::readRequest(Request& req, tcp::SocketWra
         return std::make_pair(Result::SUCCESS, HTTPCode::OK);
       }
       return std::make_pair(Result::FAILED, HTTPCode::OK);
-    } else if (res > 0) {
+    } else {
       size += res;
       buffer[size] = '\0';
       LOG(stderr, "Received buffer %s\n", buffer);
@@ -331,9 +330,9 @@ std::pair<Result, HTTPCode> HttpServer::readRequest(Request& req, tcp::SocketWra
         switch (state) {
           case State::METHOD:
           {
-            START_PROFILER("parseRequestMethod");
+            //START_PROFILER("parseRequestMethod");
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
-            STOP_PROFILER;
+            //STOP_PROFILER;
             if (Type::GET == req.type) {
               req.keepalive = true;
               return std::make_pair(Result::AGAIN, code);
@@ -347,10 +346,10 @@ std::pair<Result, HTTPCode> HttpServer::readRequest(Request& req, tcp::SocketWra
           }
           case State::HEADERS:
           {
-            START_PROFILER("parseHeader");
+            //START_PROFILER("parseHeader");
             bool hasNext;
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
-            STOP_PROFILER;
+            //STOP_PROFILER;
             if (HTTPCode::OK != code) {
               LOG(stderr, "Header : %s. Code : %d\n", buffer + offset, code);
               return std::make_pair(Result::CLOSE, code);
@@ -460,8 +459,9 @@ void HttpServer::eventsThreadFunc()
   int nfds;
 
   do {
-    nfds = epoll_wait(epollFd_, events, MAX_EVENTS, -1, "epoll_events");
-    for (int i = 0; i < nfds; ++i) {
+    nfds = epoll_wait(epollFd_, events, MAX_EVENTS, -1);
+    int i;
+    for (i = 0; i < nfds; ++i) {
       if (events[i].data.fd == int(sock_)) {
         for (;;) {
           tcp::SocketWrapper sock = sock_.accept4(SOCK_NONBLOCK);
@@ -469,57 +469,82 @@ void HttpServer::eventsThreadFunc()
             break;
           }
 
-          ev.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET;
+          {
+            int one = 1;
+            int res = sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+            if (0 != res) {
+              LOG_CRITICAL(stderr, "Cannot set TCP_NODELAY on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+              continue;
+            }
+          }
+
+          {
+            int one = 1;
+            int res = sock.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
+            if (0 != res) {
+              LOG_CRITICAL(stderr, "Cannot set TCP_QUICKACK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+              continue;
+            }
+          }
+
+          bool closed = false;
+          for(;;) {
+            Result res = handleRequest(sock);
+            if (Result::CLOSE == res ||
+                Result::FAILED == res)
+            {
+              sock.shutdown();
+              sock.close();
+              closed = true;
+              break;
+            } else if (Result::SUCCESS == res) {
+              break;
+            }
+          } // for(;;)
+
+          if (closed) {
+            continue;
+          }
+
+          ev.events = EPOLLIN | EPOLLET;
           ev.data.fd = int(sock);
           if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock), &ev)) {
             LOG_CRITICAL(stderr, "epoll_ctl error, errno = %s(%d)\n", std::strerror(errno), errno);
             continue;
           }
-
-          for(;;) {
-            Result res = handleRequest(sock);
-            if (Result::CLOSE == res ||
-                Result::FAILED == res) {
-              sock.shutdown();
-              sock.close();
-              break;
-            } else if (Result::SUCCESS == res) {
-              break;
-            }
-          }
-        }
+        } // for (;;)
       } else {
         tcp::SocketWrapper sock(events[i].data.fd);
-        if ((events[i].events & EPOLLERR) ||
-            (events[i].events & EPOLLHUP) ||
-            (events[i].events & EPOLLRDHUP))
+        if ((events[i].events & EPOLLERR)   ||
+            (events[i].events & EPOLLHUP)   ||
+           !(events[i].events & EPOLLIN))
         {
           sock.shutdown();
           sock.close();
+          continue;
         }
-        bool in = (events[i].events & EPOLLIN);
-        bool out = (events[i].events & EPOLLOUT);
-        if (in && out) {
-          for(;;) {
-            Result res = handleRequest(sock);
-            if (Result::CLOSE == res ||
-                Result::FAILED == res) {
-              sock.shutdown();
-              sock.close();
-              break;
-            } else if (Result::SUCCESS == res) {
-              break;
-            }
+        for(;;) {
+          Result res = handleRequest(sock);
+          if (Result::CLOSE == res ||
+              Result::FAILED == res)
+          {
+            sock.shutdown();
+            sock.close();
+            break;
+          } else if (Result::SUCCESS == res) {
+            break;
           }
-        }
+        } // for(;;)
       }
-    }
+    } // for (i = 0; i < nfds; ++i) {
+
   } while (running_ && nfds >= 0);
+  LOG_CRITICAL(stderr, "Events thread is stopped\n");
 }
 
 Result HttpServer::doStart()
 {
-  epollFd_ = epoll_create(MAX_EVENTS);
+  epollFd_ = epoll_create(64 * 1024);
   if (-1 == epollFd_) {
     return Result::FAILED;
   }

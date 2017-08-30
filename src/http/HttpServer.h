@@ -25,7 +25,7 @@ private:
   volatile bool running_ = true;
   int epollFd_;
 
-  static constexpr size_t BUFFER_SIZE = 4 * 1024;
+  static constexpr size_t BUFFER_SIZE = 8 * 1024;
   static constexpr int MAX_EVENTS = 1024;
 private:
   void eventsThreadFunc();
