@@ -79,7 +79,7 @@ Result User::getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSiz
 {
   static constexpr size_t COUNTRY_CAPACITY = 51;
   thread_local char country[COUNTRY_CAPACITY];
-  thread_local size_t size;
+  thread_local size_t countrySize;
   struct Parameters
   {
     std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
@@ -120,10 +120,10 @@ Result User::getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSiz
       } else if (0 == strncmp(param, "toDate", val - param)) {
         PARSE_INT32(requestParameter.date.second, val + 1, paramEnd);
       } else if (0 == strncmp(param, "country", val - param)) {
-        if (!uriDecode(country, size, COUNTRY_CAPACITY, val + 1, strlen(val + 1))) {
+        if (!uriDecode(country, countrySize, COUNTRY_CAPACITY, val + 1, strlen(val + 1))) {
           return Result::FAILED;
         }
-        requestParameter.country = in_place_string(country, size);
+        requestParameter.country = in_place_string(country, countrySize);
       } else if (0 == strncmp(param, "toDistance", val - param)) {
         PARSE_INT32(requestParameter.toDistance, val + 1, paramEnd);
       } else {

@@ -97,13 +97,13 @@ int SocketWrapper::close()
 
 int SocketWrapper::send(const char* buffer, size_t size, int flags)
 {
-  //START_PROFILER("send");
+  START_PROFILER("send");
   return ::send(sock_, buffer, size, flags);
 }
 
 int SocketWrapper::recv(char* buffer, size_t size, int flags)
 {
-  //START_PROFILER("recv");
+  START_PROFILER("recv");
   return ::recv(sock_, buffer, size, flags);
 }
 

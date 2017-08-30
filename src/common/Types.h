@@ -48,7 +48,7 @@ struct in_place_string
   {}
   bool empty() const
   {
-    return 0 == size;
+    return 0 == size_;
   }
   bool operator==(const in_place_string& rhs) const
   {
