@@ -29,6 +29,8 @@ private:
   static constexpr int MAX_EVENTS = 1024;
   Response resp_;
 private:
+  virtual void acceptSocket(tcp::SocketWrapper sock) override;
+
   void eventsThreadFunc();
   Result handleRequest(tcp::SocketWrapper sock);
 
@@ -46,7 +48,7 @@ private:
   virtual Result doStart() override;
   virtual Result doStop() override;
 public:
-  HttpServer(db::StoragePtr& storage);
+  HttpServer(const size_t acceptThreadsCount, db::StoragePtr& storage);
   ~HttpServer();
 };
 

@@ -86,8 +86,8 @@ static const size_t RESPONSE_404_SIZE[] = { 108, 113 };
   "%zu\n"\
   "\n"
 
-HttpServer::HttpServer(db::StoragePtr& storage):
-  tcp::TcpServer(),
+HttpServer::HttpServer(const size_t acceptThreadsCount, db::StoragePtr& storage):
+  tcp::TcpServer(acceptThreadsCount),
   storage_(storage)
 {}
 
@@ -454,89 +454,47 @@ void HttpServer::send(tcp::SocketWrapper sock, const char* buffer, int size)
   }
 }
 
+void HttpServer::acceptSocket(tcp::SocketWrapper sock)
+{
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLET;
+  ev.data.fd = int(sock);
+  if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock), &ev)) {
+    LOG_CRITICAL(stderr, "epoll_ctl error, errno = %s(%d)\n", std::strerror(errno), errno);
+    return;
+  }
+}
+
 void HttpServer::eventsThreadFunc()
 {
-  struct epoll_event ev, events[MAX_EVENTS];
+  struct epoll_event events[MAX_EVENTS];
   int nfds;
 
   do {
     nfds = epoll_wait(epollFd_, events, MAX_EVENTS, -1);
     int i;
     for (i = 0; i < nfds; ++i) {
-      if (events[i].data.fd == int(sock_)) {
-        for (;;) {
-          tcp::SocketWrapper sock = sock_.accept4(SOCK_NONBLOCK);
-          if (-1 == int(sock)) {
-            break;
-          }
-
-          {
-            int one = 1;
-            int res = sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-            if (0 != res) {
-              LOG_CRITICAL(stderr, "Cannot set TCP_NODELAY on socket, errno = %s(%d)\n", std::strerror(errno), errno);
-              continue;
-            }
-          }
-
-          {
-            int one = 1;
-            int res = sock.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
-            if (0 != res) {
-              LOG_CRITICAL(stderr, "Cannot set TCP_QUICKACK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
-              continue;
-            }
-          }
-
-          bool closed = false;
-          for(;;) {
-            Result res = handleRequest(sock);
-            if (Result::CLOSE == res ||
-                Result::FAILED == res)
-            {
-              sock.shutdown();
-              sock.close();
-              closed = true;
-              break;
-            } else if (Result::SUCCESS == res) {
-              break;
-            }
-          } // for(;;)
-
-          if (closed) {
-            continue;
-          }
-
-          ev.events = EPOLLIN | EPOLLET;
-          ev.data.fd = int(sock);
-          if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock), &ev)) {
-            LOG_CRITICAL(stderr, "epoll_ctl error, errno = %s(%d)\n", std::strerror(errno), errno);
-            continue;
-          }
-        } // for (;;)
-      } else {
-        tcp::SocketWrapper sock(events[i].data.fd);
-        if ((events[i].events & EPOLLERR)   ||
-            (events[i].events & EPOLLHUP)   ||
-           !(events[i].events & EPOLLIN))
+      tcp::SocketWrapper sock(events[i].data.fd);
+      if ((events[i].events & EPOLLERR)   ||
+          (events[i].events & EPOLLHUP)   ||
+         !(events[i].events & EPOLLIN))
+      {
+        sock.shutdown();
+        sock.close();
+        continue;
+      }
+      for(;;) {
+        Result res = handleRequest(sock);
+        if (Result::CLOSE == res ||
+            Result::FAILED == res)
         {
           sock.shutdown();
           sock.close();
-          continue;
+          break;
+        } else if (Result::SUCCESS == res) {
+          break;
         }
-        for(;;) {
-          Result res = handleRequest(sock);
-          if (Result::CLOSE == res ||
-              Result::FAILED == res)
-          {
-            sock.shutdown();
-            sock.close();
-            break;
-          } else if (Result::SUCCESS == res) {
-            break;
-          }
-        } // for(;;)
-      }
+      } // for(;;)
     } // for (i = 0; i < nfds; ++i) {
 
   } while (running_ && nfds >= 0);
@@ -547,12 +505,6 @@ Result HttpServer::doStart()
 {
   epollFd_ = epoll_create(64 * 1024);
   if (-1 == epollFd_) {
-    return Result::FAILED;
-  }
-  struct epoll_event ev;
-  ev.events = EPOLLIN | EPOLLET;
-  ev.data.fd = int(sock_);
-  if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock_), &ev)) {
     return Result::FAILED;
   }
 
@@ -567,10 +519,8 @@ Result HttpServer::doStart()
 
 Result HttpServer::doStop()
 {
+  running_ = false;
   if (eventsThread_.joinable()) {
-    running_ = false;
-    sock_.close();
-    close(epollFd_);
     eventsThread_.join();
     eventsThread_ = std::thread();
   }

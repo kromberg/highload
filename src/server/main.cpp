@@ -30,6 +30,10 @@ int main(int argc, char* argv[])
   if (argc >= 2) {
     serversCount = std::stoul(argv[1]);
   }
+  size_t acceptThreadsCount = 1;
+  if (argc >= 3) {
+    acceptThreadsCount = std::stoul(argv[1]);
+  }
 
   db::StoragePtr storage(new db::Storage);
   storage->load("/tmp/data/data.zip");
@@ -38,7 +42,7 @@ int main(int argc, char* argv[])
   running = true;
   std::vector<http::HttpServer*> servers(serversCount, nullptr);
   for (auto server : servers) {
-    server = new http::HttpServer(storage);
+    server = new http::HttpServer(acceptThreadsCount, storage);
     Result res = server->start();
     if (Result::SUCCESS != res) {
       running = false;

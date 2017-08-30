@@ -1,1 +1,1 @@
-add_library(my_tcp STATIC Socket.cpp TcpServer.cpp)
+add_library(my_tcp STATIC Socket.cpp TcpServer.cpp AcceptingThread.cpp)
