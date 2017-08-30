@@ -40,14 +40,14 @@ Result TcpServer::start(const uint16_t port)
     }
   }
 
-  /*{
+  {
     int one = 1;
     int res = sock_.setsockopt(IPPROTO_TCP, TCP_DEFER_ACCEPT, &one, sizeof(one));
     if (0 != res) {
       LOG_CRITICAL(stderr, "Cannot set TCP_DEFER_ACCEPT on socket, errno = %s(%d)\n", std::strerror(errno), errno);
       return Result::FAILED;
     }
-  }*/
+  }
 
   {
     int one = 1;
@@ -102,7 +102,7 @@ Result TcpServer::start(const uint16_t port)
     return Result::FAILED;
   }
 
-  res = sock_.listen(128);
+  res = sock_.listen(1024);
   if (res < 0)
   {
     LOG_CRITICAL(stderr, "Cannot bind server socket. errno = %d(%s)\n",

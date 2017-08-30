@@ -27,6 +27,7 @@ private:
 
   static constexpr size_t BUFFER_SIZE = 8 * 1024;
   static constexpr int MAX_EVENTS = 1024;
+  Response resp_;
 private:
   void eventsThreadFunc();
   Result handleRequest(tcp::SocketWrapper sock);

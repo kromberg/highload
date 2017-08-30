@@ -58,7 +58,8 @@ void Location::getJson(Buffer& buffer, const int32_t id)
     snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, buffer.capacity - DB_RESPONSE_200_SIZE,
       "{\"id\":%d,\"place\":\"%s\",\"country\":\"%s\",\"city\":\"%s\",\"distance\":%d}",
       id, place.c_str(), country.c_str(), city.c_str(), distance);
-  buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+  buffer.size = snprintf(buffer.buffer + DB_RESPONSE_200_PART1_SIZE, DB_RESPONSE_200_PART2_SIZE, DB_RESPONSE_200_PART2, size);
+  buffer.size += DB_RESPONSE_200_PART1_SIZE;
   buffer.buffer[buffer.size - 1] = '\n';
   buffer.size += size;
 }
@@ -154,7 +155,8 @@ Result Location::getJsonAvgScore(Buffer& buffer, char* params, const int32_t par
   int size =
     snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, buffer.capacity - DB_RESPONSE_200_SIZE,
       "{\"avg\":%.5Lf}", avg);
-  buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+  buffer.size = snprintf(buffer.buffer + DB_RESPONSE_200_PART1_SIZE, DB_RESPONSE_200_PART2_SIZE, DB_RESPONSE_200_PART2, size);
+  buffer.size += DB_RESPONSE_200_PART1_SIZE;
   buffer.buffer[buffer.size - 1] = '\n';
   buffer.size += size;
   return Result::SUCCESS;

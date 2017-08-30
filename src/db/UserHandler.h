@@ -23,7 +23,7 @@ struct UserHandler {
     BIRTH_DATE,
     GENDER,
   };
-  static std::unordered_map<std::string, State> strToState;
+  static std::unordered_map<in_place_string, State> strToState;
   State state_;
   uint16_t filledFields_;
   int32_t id_;
@@ -81,7 +81,7 @@ struct UserHandler {
   }
   bool StartObject() { return true; }
   bool Key(const char* str, SizeType length, bool copy) {
-    auto it = strToState.find(std::string(str, length));
+    auto it = strToState.find(in_place_string(str, length));
     if (strToState.end() == it) {
       return false;
     }

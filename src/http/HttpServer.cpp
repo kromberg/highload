@@ -96,7 +96,7 @@ HttpServer::~HttpServer()
 
 HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
 {
-  static std::unordered_map<std::string, Table> strToTableMap = 
+  static std::unordered_map<in_place_string, Table> strToTableMap = 
   {
     { "users",     Table::USERS },
     { "locations", Table::LOCATIONS },
@@ -145,7 +145,7 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
       case State::TABLE2:
       {
         //LOG(stderr, "Searching for table: %s\n", prev);
-        auto it = strToTableMap.find(std::string(prev, size));
+        auto it = strToTableMap.find(in_place_string(prev, size));
         if (strToTableMap.end() == it) {
           return HTTPCode::BAD_REQ;
         }
@@ -256,7 +256,8 @@ Result HttpServer::handleRequest(tcp::SocketWrapper sock)
   Request req;
   std::pair<Result, HTTPCode> res = readRequest(req, sock);
   if (Result::SUCCESS == res.first ||
-      Result::FAILED  == res.first) {
+      Result::FAILED  == res.first)
+  {
     return res.first;
   }
   HTTPCode code = res.second;
@@ -271,10 +272,10 @@ Result HttpServer::handleRequest(tcp::SocketWrapper sock)
     return res.first;
   }
 
-  Response resp;
+  resp_.buffer.size = 0;
   {
-    //START_PROFILER("handler");
-    code = handler(resp, *storage_, req);
+    START_PROFILER("handler");
+    code = handler(resp_, *storage_, req);
   }
   if (HTTPCode::OK != code) {
     sendResponse(sock, code, req.keepalive);
@@ -284,7 +285,7 @@ Result HttpServer::handleRequest(tcp::SocketWrapper sock)
   if (Type::POST == req.type) {
     sendResponse(sock, HTTPCode::OK, false);
   } else {
-    sendResponse(sock, resp);
+    sendResponse(sock, resp_);
   }
 
   return res.first;
@@ -554,6 +555,9 @@ Result HttpServer::doStart()
   if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock_), &ev)) {
     return Result::FAILED;
   }
+
+  // fill response buffer
+  strncpy(resp_.arr, RESPONSE_200_PART1_KEEPALIVE, RESPONSE_200_PART1_KEEPALIVE_SIZE);
 
   std::thread tmpThread(&HttpServer::eventsThreadFunc, this);
   eventsThread_ = std::move(tmpThread);
