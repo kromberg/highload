@@ -64,6 +64,10 @@ struct in_place_string
     }
     return (0 == strncmp(buffer_, rhs.c_str(), size_));
   }
+  operator std::string ()
+  {
+    return std::string(buffer_, size_);
+  }
 };
 
 template<>

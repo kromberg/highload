@@ -83,6 +83,7 @@ Result User::getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSiz
   struct Parameters
   {
     std::pair<int32_t, int32_t> date{std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()};
+    bool countryToLong = false;
     in_place_string country;
     int32_t toDistance = std::numeric_limits<int32_t>::max();
     bool valid(const Visit& visit) const
@@ -121,9 +122,10 @@ Result User::getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSiz
         PARSE_INT32(requestParameter.date.second, val + 1, paramEnd);
       } else if (0 == strncmp(param, "country", val - param)) {
         if (!uriDecode(country, countrySize, COUNTRY_CAPACITY, val + 1, strlen(val + 1))) {
-          return Result::FAILED;
+          requestParameter.countryToLong = true;
+        } else {
+          requestParameter.country = in_place_string(country, countrySize);
         }
-        requestParameter.country = in_place_string(country, countrySize);
       } else if (0 == strncmp(param, "toDistance", val - param)) {
         PARSE_INT32(requestParameter.toDistance, val + 1, paramEnd);
       } else {
@@ -136,36 +138,43 @@ Result User::getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSiz
     } while (next);
   }
 
-  std::multimap<int32_t, Visit*> visits;
-  for (const auto& visit : visits_) {
-    if (requestParameter.valid(*visit.second)) {
-      visits.emplace(
-        std::piecewise_construct,
-        std::forward_as_tuple(visit.second->visited_at),
-        std::forward_as_tuple(visit.second));
-    }
-  }
   int offset = DB_RESPONSE_200_SIZE;
   int size = 0;
 
-  size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "{\"visits\":[");
-  offset += size;
+  if (requestParameter.countryToLong) {
+    size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "{\"visits\":[]}");
+    offset += size;
+  } else {
 
-  for (auto visit : visits) {
-    size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "{\"mark\":%d,\"visited_at\":%d,\"place\":\"%s\"},",
-      visit.second->mark, visit.second->visited_at, visit.second->location_->place.c_str());
+  std::multimap<int32_t, Visit*> visits;
+    for (const auto& visit : visits_) {
+      if (requestParameter.valid(*visit.second)) {
+        visits.emplace(
+          std::piecewise_construct,
+          std::forward_as_tuple(visit.second->visited_at),
+          std::forward_as_tuple(visit.second));
+      }
+    }
+
+    size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "{\"visits\":[");
+    offset += size;
+
+    for (auto visit : visits) {
+      size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "{\"mark\":%d,\"visited_at\":%d,\"place\":\"%s\"},",
+        visit.second->mark, visit.second->visited_at, visit.second->location_->place.c_str());
+      offset += size;
+    }
+    if (!visits.empty()) {
+      -- offset;
+    }
+    size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "]}");
     offset += size;
   }
-  if (!visits.empty()) {
-    -- offset;
-  }
-  size = snprintf(buffer.buffer + offset, buffer.capacity - offset, "]}");
-  offset += size;
 
-  buffer.size = snprintf(buffer.buffer + DB_RESPONSE_200_PART1_SIZE, DB_RESPONSE_200_PART2_SIZE, DB_RESPONSE_200_PART2, offset);
+  buffer.size = snprintf(buffer.buffer + DB_RESPONSE_200_PART1_SIZE, DB_RESPONSE_200_PART2_SIZE, DB_RESPONSE_200_PART2, offset - DB_RESPONSE_200_SIZE);
   buffer.size += DB_RESPONSE_200_PART1_SIZE;
   buffer.buffer[buffer.size - 1] = '\n';
-  buffer.size += offset;
+  buffer.size = offset;
   return Result::SUCCESS;
 }
 
