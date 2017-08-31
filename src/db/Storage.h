@@ -53,17 +53,17 @@ public:
 
   Result addUser(const char* content);
   Result updateUser(const int32_t id, const char* content);
-  Result getUser(ConstBuffer& buffer, const int32_t id);
+  Result getUser(Buffer& buffer, const int32_t id);
   Result getUserVisits(Buffer& buffer, const int32_t id, char* params, const int32_t paramsSize);
 
   Result addLocation(const char* content);
   Result updateLocation(const int32_t id, const char* content);
-  Result getLocation(ConstBuffer& buffer, const int32_t id);
+  Result getLocation(Buffer& buffer, const int32_t id);
   Result getLocationAvgScore(Buffer& buffer, const int32_t id, char* params, const int32_t paramsSize);
 
   Result addVisit(const char* content);
   Result updateVisit(const int32_t id, const char* content);
-  Result getVisit(ConstBuffer& buffer, const int32_t id);
+  Result getVisit(Buffer& buffer, const int32_t id);
 };
 
 typedef std::shared_ptr<Storage> StoragePtr;

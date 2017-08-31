@@ -27,8 +27,8 @@ struct Location
   std::string city;
   int32_t distance;
 
-  char buffer_[1024];
-  int bufferSize_ = 0;
+  /*char buffer_[512];
+  int bufferSize_ = 0;*/
 
   std::unordered_map<int32_t, Visit*> visits_;
 
@@ -43,9 +43,8 @@ struct Location
     const rapidjson::Value& jsonVal);
   Location(const Location& location);
   Location& operator=(Location&& location);
-  void cache(const int32_t id);
-  bool update(const rapidjson::Value& jsonVal);
-  void getJson(ConstBuffer& buffer, const int32_t id);
+  //void cache(const int32_t id);
+  void getJson(Buffer& buffer, const int32_t id);
   Result getJsonAvgScore(Buffer& buffer, char* params, const int32_t paramsSize) const;
   void dump() const;
 };

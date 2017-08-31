@@ -6,8 +6,9 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include <signal.h>
 #include <unistd.h>
-#include <fcntl.h>
+#include <sys/epoll.h>
 
 #include <common/Profiler.h>
 
@@ -87,8 +88,7 @@ static const size_t RESPONSE_404_SIZE[] = { 108, 113 };
 
 HttpServer::HttpServer(db::StoragePtr& storage):
   tcp::TcpServer(),
-  storage_(storage),
-  threadPool_(THREADS_COUNT, std::bind(&HttpServer::handleRequest, this, std::placeholders::_1))
+  storage_(storage)
 {}
 
 HttpServer::~HttpServer()
@@ -96,7 +96,7 @@ HttpServer::~HttpServer()
 
 HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
 {
-  static std::unordered_map<std::string, Table> strToTableMap = 
+  static std::unordered_map<in_place_string, Table> strToTableMap = 
   {
     { "users",     Table::USERS },
     { "locations", Table::LOCATIONS },
@@ -121,9 +121,9 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
   char* next = strchr(url + 1, '?');
   if (next) {
     *next = '\0';
-    req.params_ = next + 1;
-    req.paramsSize_ = urlSize - (req.params_ - url);
-    urlSize -= (req.paramsSize_ + 1); 
+    req.params = next + 1;
+    req.paramsSize = urlSize - (req.params - url);
+    urlSize -= (req.paramsSize + 1); 
   }
 
   char* prev = nullptr;
@@ -145,17 +145,17 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
       case State::TABLE2:
       {
         //LOG(stderr, "Searching for table: %s\n", prev);
-        auto it = strToTableMap.find(std::string(prev, size));
+        auto it = strToTableMap.find(in_place_string(prev, size));
         if (strToTableMap.end() == it) {
           return HTTPCode::BAD_REQ;
         }
         if (State::TABLE1 == state) {
           LOG(stderr, "TABLE 1: %s\n", prev);
-          req.table1_ = it->second;
+          req.table1 = it->second;
           state = State::ID;
         } else {
           LOG(stderr, "TABLE 2: %s\n", prev);
-          req.table2_ = it->second;
+          req.table2 = it->second;
           state = State::ERROR;
         }
         break;
@@ -164,10 +164,10 @@ HTTPCode HttpServer::parseURL(Request& req, char* url, int32_t urlSize)
       {
         LOG(stderr, "ID: %s\n", prev);
         if (0 == strncmp(prev, "new", size)) {
-          req.id_ = -1;
+          req.id = -1;
         } else {
           char* end;
-          req.id_ = static_cast<int32_t>(strtol(prev, &end, 10));
+          req.id = static_cast<int32_t>(strtol(prev, &end, 10));
           if (!end) {
             return HTTPCode::NOT_FOUND;
           }
@@ -197,9 +197,9 @@ HTTPCode HttpServer::parseRequestMethod(Request& req, char* reqMethod, int32_t s
   }
   *next = '\0';
   if (0 == strncmp(reqMethod, "POST", next - reqMethod)) {
-    req.type_ = Type::POST;
+    req.type = Type::POST;
   } else if (0 == strncmp(reqMethod, "GET", next - reqMethod)) {
-    req.type_ = Type::GET;
+    req.type = Type::GET;
   } else {
     return HTTPCode::BAD_REQ;
   }
@@ -239,64 +239,59 @@ HTTPCode HttpServer::parseHeader(Request& req, bool& hasNext, char* header, int3
         return HTTPCode::BAD_REQ;
       }
       char* end;
-      req.contentLength_ = static_cast<int32_t>(strtol(val + 1, &end, 10));
+      req.contentLength = static_cast<int32_t>(strtol(val + 1, &end, 10));
       if (!end) {
         return HTTPCode::NOT_FOUND;
       }
     } else if (0 == strncmp(header + 7, "-Type", 5)) {
-      req.hasContentType_ = true;
+      req.hasContentType = true;
     }
   }
   hasNext = true;
   return HTTPCode::OK;
 }
 
-void HttpServer::handleRequest(tcp::SocketWrapper sock)
+Result HttpServer::handleRequest(tcp::SocketWrapper sock)
 {
-  tcp::Socket _sock(sock);
+  Request req;
+  std::pair<Result, HTTPCode> res = readRequest(req, sock);
+  if (Result::SUCCESS == res.first ||
+      Result::FAILED  == res.first)
+  {
+    return res.first;
+  }
+  HTTPCode code = res.second;
+  if (HTTPCode::OK != code) {
+    sendResponse(sock, code, req.keepalive);
+    return res.first;
+  }
 
-  bool keepalive = false;
-  do {
-    Request req;
-    HTTPCode code;
-    {
-      code = readRequest(req, _sock);
-    }
-    if (HTTPCode::NO_ERROR == code) {
-      return;
-    }
-    keepalive = req.keepalive_;
-    if (HTTPCode::OK != code) {
-      sendResponse(_sock, code, keepalive);
-      continue;
-    }
+  StateMachine::Handler handler = StateMachine::getHandler(req);
+  if (!handler) {
+    sendResponse(sock, code, req.keepalive);
+    return res.first;
+  }
 
-    StateMachine::Handler handler = StateMachine::getHandler(req);
-    if (!handler) {
-      sendResponse(_sock, code, keepalive);
-      continue;
-    }
+  resp_.buffer.size = 0;
+  {
+    START_PROFILER("handler");
+    code = handler(resp_, *storage_, req);
+  }
+  if (HTTPCode::OK != code) {
+    sendResponse(sock, code, req.keepalive);
+    return res.first;
+  }
 
-    Response resp;
-    {
-      START_PROFILER("handler");
-      code = handler(resp, *storage_, req);
-      STOP_PROFILER;
-    }
-    if (HTTPCode::OK != code) {
-      sendResponse(_sock, code, keepalive);
-      continue;
-    }
+  if (Type::POST == req.type) {
+    sendResponse(sock, HTTPCode::OK, false);
+  } else {
+    sendResponse(sock, resp_);
+  }
 
-    if (Type::POST == req.type_) {
-      sendResponse(_sock, HTTPCode::OK, keepalive);
-    } else {
-      sendResponse(_sock, resp, keepalive);
-    }
-  } while (keepalive);
+  return res.first;
 }
 
-HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
+std::pair<Result, HTTPCode> HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
 {
   enum class State
   {
@@ -304,29 +299,31 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
     HEADERS,
     BODY,
   } state = State::METHOD;
-  HTTPCode code = HTTPCode::NO_ERROR;
-  thread_local char buffer[4 * 1024];
+  HTTPCode code = HTTPCode::OK;
+  char buffer[BUFFER_SIZE];
   int offset = 0, size = 0;
   int res;
-  do {
-    res = sock.recv(buffer + size, sizeof(buffer) - size);
-    LOG(stderr, "res = %d\n", res);
-    if (-1 == res) {
-      if (EAGAIN == errno || EWOULDBLOCK == errno) {
-        res = 0;
+  for (;;) {
+    res = sock.recv(buffer + size, sizeof(buffer) - size, MSG_DONTWAIT);
+    if (0 == res) {
+      return std::make_pair(Result::FAILED, HTTPCode::OK);
+    } else if (res < 0) {
+      if (EINTR == errno) {
         continue;
+      } else if (EWOULDBLOCK == errno || EAGAIN == errno) {
+        return std::make_pair(Result::SUCCESS, HTTPCode::OK);
       }
-    }
-    if (res > 0) {
+      return std::make_pair(Result::FAILED, HTTPCode::OK);
+    } else {
       size += res;
       buffer[size] = '\0';
       LOG(stderr, "Received buffer %s\n", buffer);
       if (State::BODY == state) {
-        if (size - offset < req.contentLength_) {
+        if (size - offset < req.contentLength) {
           continue;
         }
-        req.content_ = buffer + offset;
-        return HTTPCode::OK;
+        req.content = buffer + offset;
+        return std::make_pair(Result::CLOSE, HTTPCode::OK);
       }
       char* next = strchr(buffer + offset, '\n');
       while (next && offset < size) {
@@ -334,29 +331,29 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
         switch (state) {
           case State::METHOD:
           {
-            START_PROFILER("parseRequestMethod");
+            //START_PROFILER("parseRequestMethod");
             code = parseRequestMethod(req, buffer + offset, next - buffer - offset);
-            STOP_PROFILER;
+            //STOP_PROFILER;
+            if (Type::GET == req.type) {
+              req.keepalive = true;
+              return std::make_pair(Result::AGAIN, code);
+            }
             if (HTTPCode::OK != code) {
               LOG(stderr, "Method : %s. Code : %d\n", buffer + offset, code);
-              return code;
-            }
-            if (Type::GET == req.type_) {
-              req.keepalive_ = true;
-              return HTTPCode::OK;
+              return std::make_pair(Result::CLOSE, code);
             }
             state = State::HEADERS;
             break;
           }
           case State::HEADERS:
           {
-            START_PROFILER("parseHeader");
+            //START_PROFILER("parseHeader");
             bool hasNext;
             code = parseHeader(req, hasNext, buffer + offset, next - buffer - offset);
-            STOP_PROFILER;
+            //STOP_PROFILER;
             if (HTTPCode::OK != code) {
               LOG(stderr, "Header : %s. Code : %d\n", buffer + offset, code);
-              return code;
+              return std::make_pair(Result::CLOSE, code);
             }
             if (!hasNext) {
               state = State::BODY;
@@ -368,80 +365,35 @@ HTTPCode HttpServer::readRequest(Request& req, tcp::SocketWrapper sock)
         }
         offset = next - buffer + 1;
         if (State::BODY == state) {
-          if (size - offset < req.contentLength_) {
+          if (size - offset < req.contentLength) {
             break;
           }
-          req.content_ = buffer + offset;
-          return HTTPCode::OK;
+          req.content = buffer + offset;
+          return std::make_pair(Result::CLOSE, HTTPCode::OK);
         }
         next = strchr(buffer + offset, '\n');
       }
     }
-  } while (res > 0);
-  return code;
+  }
+  return std::make_pair(Result::CLOSE, code);
 }
 
 void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool keepalive)
 {
-  //int* outPipe = outPipes_[threadIdx_.fetch_add(1) % THREADS_COUNT];
-
   size_t idx = keepalive ? 1 : 0;
   switch (code) {
     case HTTPCode::OK:
     {
-      /*LOG(stderr, "200: tee\n");
-      ssize_t res = tee(pipe200_[0], outPipe[1], RESPONSE_200_SIZE, 0);
-      if (-1 == res) {
-        LOG_CRITICAL(stderr, "Cannot send response with 200 code\n");
-        return ;
-      }
-      LOG(stderr, "200: %zd bytes have been teed\n", res);
-      res = splice(outPipe[0], nullptr, int(sock), nullptr, RESPONSE_200_SIZE, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-      if (-1 == res) {
-        LOG_CRITICAL(stderr, "Cannot send response with 200 code\n");
-        return ;
-      }
-      LOG(stderr, "200: %zd bytes have been spliced\n", res);
-      */
       send(sock, RESPONSE_200[idx], RESPONSE_200_SIZE[idx]);
       break;
     }
     case HTTPCode::BAD_REQ:
     {
-      /*LOG(stderr, "400: tee\n");
-      ssize_t res = tee(pipe400_[0], outPipe[1], RESPONSE_400_SIZE, 0);
-      if (-1 == res) {
-        LOG_CRITICAL(stderr, "Cannot send response with 400 code\n");
-        return ;
-      }
-      LOG(stderr, "400: %zd bytes have been teed\n", res);
-      res = splice(outPipe[0], nullptr, int(sock), nullptr, RESPONSE_400_SIZE, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-      if (-1 == res) {
-        LOG_CRITICAL(stderr, "Cannot send response with 400 code\n");
-        return ;
-      }
-      LOG(stderr, "400: %zd bytes have been spliced\n", res);
-      */
       send(sock, RESPONSE_400[idx], RESPONSE_400_SIZE[idx]);
       break;
     }
     case HTTPCode::NOT_FOUND:
     {
-      /*
-      LOG(stderr, "404: tee\n");
-      ssize_t res = tee(pipe404_[0], outPipe[1], RESPONSE_404_SIZE, 0);
-      if (-1 == res) {
-        LOG_CRITICAL(stderr, "Cannot send response with 404 code\n");
-        return ;
-      }
-      LOG(stderr, "404: %zd bytes have been teed\n", res);
-      res = splice(outPipe[0], nullptr, int(sock), nullptr, RESPONSE_404_SIZE, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-      if (-1 == res) {
-        LOG_CRITICAL(stderr, "Cannot send response with 404 code\n");
-        return ;
-      }
-      LOG(stderr, "404: %zd bytes have been spliced\n", res);
-      */
       send(sock, RESPONSE_404[idx], RESPONSE_404_SIZE[idx]);
       break;
     }
@@ -450,7 +402,7 @@ void HttpServer::sendResponse(tcp::SocketWrapper sock, const HTTPCode code, bool
   }
 }
 
-void HttpServer::sendResponse(tcp::SocketWrapper sock, const Response& resp, bool keepalive)
+void HttpServer::sendResponse(tcp::SocketWrapper sock, const Response& resp)
 {
   const char* buffer;
   int size;
@@ -502,60 +454,127 @@ void HttpServer::send(tcp::SocketWrapper sock, const char* buffer, int size)
   }
 }
 
-Result HttpServer::doStart()
+void HttpServer::eventsThreadFunc()
 {
-  return Result::SUCCESS;
-#if 0
-  pipe2(pipe200_, O_NONBLOCK);
-  pipe2(pipe400_, O_NONBLOCK);
-  pipe2(pipe404_, O_NONBLOCK);
-  for (size_t i = 0; i < THREADS_COUNT; ++i) {
-    pipe2(outPipes_[i], O_NONBLOCK);
-  }
+  struct epoll_event ev, events[MAX_EVENTS];
+  int nfds;
 
-  {
-    write(pipe200_[1], RESPONSE_200, RESPONSE_200_SIZE);
-    /*struct iovec iov{RESPONSE_200, RESPONSE_200_SIZE};
-    ssize_t res = vmsplice(pipe200_[1], &iov, 1, 0);
-    if (-1 == res) {
-      return Result::FAILED;
-    }*/
-  }
-  {
-    write(pipe400_[1], RESPONSE_400, RESPONSE_400_SIZE);
-    /*struct iovec iov{RESPONSE_400, RESPONSE_400_SIZE};
-    ssize_t res = vmsplice(pipe400_[0], &iov, 1, 0);
-    if (-1 == res) {
-      return Result::FAILED;
-    }*/
-  }
-  {
-    write(pipe404_[1], RESPONSE_404, RESPONSE_404_SIZE);
-    /*struct iovec iov{RESPONSE_404, RESPONSE_404_SIZE};
-    ssize_t res = vmsplice(pipe404_[0], &iov, 1, 0);
-    if (-1 == res) {
-      return Result::FAILED;
-    }*/
-  }
+  do {
+    nfds = epoll_wait(epollFd_, events, MAX_EVENTS, -1);
+    int i;
+    for (i = 0; i < nfds; ++i) {
+      if (events[i].data.fd == int(sock_)) {
+        for (;;) {
+          tcp::SocketWrapper sock = sock_.accept4(SOCK_NONBLOCK);
+          if (-1 == int(sock)) {
+            break;
+          }
 
-  return Result::SUCCESS;
-#endif
+          {
+            int one = 1;
+            int res = sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+            if (0 != res) {
+              LOG_CRITICAL(stderr, "Cannot set TCP_NODELAY on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+              continue;
+            }
+          }
+
+          {
+            int one = 1;
+            int res = sock.setsockopt(IPPROTO_TCP, TCP_QUICKACK, &one, sizeof(one));
+            if (0 != res) {
+              LOG_CRITICAL(stderr, "Cannot set TCP_QUICKACK on socket, errno = %s(%d)\n", std::strerror(errno), errno);
+              continue;
+            }
+          }
+
+          bool closed = false;
+          for(;;) {
+            Result res = handleRequest(sock);
+            if (Result::CLOSE == res ||
+                Result::FAILED == res)
+            {
+              sock.shutdown();
+              sock.close();
+              closed = true;
+              break;
+            } else if (Result::SUCCESS == res) {
+              break;
+            }
+          } // for(;;)
+
+          if (closed) {
+            continue;
+          }
+
+          ev.events = EPOLLIN | EPOLLET;
+          ev.data.fd = int(sock);
+          if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock), &ev)) {
+            LOG_CRITICAL(stderr, "epoll_ctl error, errno = %s(%d)\n", std::strerror(errno), errno);
+            continue;
+          }
+        } // for (;;)
+      } else {
+        tcp::SocketWrapper sock(events[i].data.fd);
+        if ((events[i].events & EPOLLERR)   ||
+            (events[i].events & EPOLLHUP)   ||
+           !(events[i].events & EPOLLIN))
+        {
+          sock.shutdown();
+          sock.close();
+          continue;
+        }
+        for(;;) {
+          Result res = handleRequest(sock);
+          if (Result::CLOSE == res ||
+              Result::FAILED == res)
+          {
+            sock.shutdown();
+            sock.close();
+            break;
+          } else if (Result::SUCCESS == res) {
+            break;
+          }
+        } // for(;;)
+      }
+    } // for (i = 0; i < nfds; ++i) {
+
+  } while (running_ && nfds >= 0);
+  LOG_CRITICAL(stderr, "Events thread is stopped\n");
 }
 
-void HttpServer::acceptSocket(tcp::SocketWrapper sock)
+Result HttpServer::doStart()
 {
-  int flags = fcntl(int(sock), F_GETFL, 0);
-  if (-1 == flags) {
-    LOG_CRITICAL(stderr, "Cannot get fcntl flags, errno = %s(%d)\n", std::strerror(errno), errno);
-    return ;
+  epollFd_ = epoll_create(64 * 1024);
+  if (-1 == epollFd_) {
+    return Result::FAILED;
   }
-  int res = fcntl(int(sock), F_SETFL, flags | O_NONBLOCK);
-  if (-1 == res) {
-    LOG_CRITICAL(stderr, "Cannot set fcntl O_NONBLOCK flag, errno = %s(%d)\n", std::strerror(errno), errno);
-    return ;
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLET;
+  ev.data.fd = int(sock_);
+  if (-1 == epoll_ctl(epollFd_, EPOLL_CTL_ADD, int(sock_), &ev)) {
+    return Result::FAILED;
   }
 
-  threadPool_.run(sock);
+  // fill response buffer
+  strncpy(resp_.arr, RESPONSE_200_PART1_KEEPALIVE, RESPONSE_200_PART1_KEEPALIVE_SIZE);
+
+  std::thread tmpThread(&HttpServer::eventsThreadFunc, this);
+  eventsThread_ = std::move(tmpThread);
+
+  return Result::SUCCESS;
+}
+
+Result HttpServer::doStop()
+{
+  if (eventsThread_.joinable()) {
+    running_ = false;
+    sock_.close();
+    close(epollFd_);
+    eventsThread_.join();
+    eventsThread_ = std::thread();
+  }
+  return Result::SUCCESS;
 }
 
 } // namespace http
