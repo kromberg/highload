@@ -1,6 +1,9 @@
 #ifndef _DB_UTILS_H_
 #define _DB_UTILS_H_
 
+#include <common/Types.h>
+#include <common/Profiler.h>
+
 namespace db
 {
 
@@ -13,28 +16,17 @@ namespace db
   }\
 }
 
-#define DB_RESPONSE_200 \
-  "HTTP/1.1 200 OK\n"\
-  "Content-Type: application/json; charset=UTF-8\n"\
-  "Connection: keep-alive\n"\
-  "Content-Length: %5d\n"\
+#define DB_RESPONSE_200_PART2 \
+  "%5d\n"\
   "\n"
 #define DB_RESPONSE_200_SIZE 108
+#define DB_RESPONSE_200_PART1_SIZE 101
+#define DB_RESPONSE_200_PART2_SIZE 7
 
-struct ConstBuffer
-{
-  const char* buffer = nullptr;
-  int size = 0;
-};
+using common::ConstBuffer;
+using common::Buffer;
 
-struct Buffer
-{
-  char* buffer = nullptr;
-  int capacity = 0;
-  int size = 0;
-};
-
-inline void uriDecode(std::string& res, char* str, int32_t size)
+inline bool uriDecode(char* res, size_t& outSize, const size_t capacity, char* str, int32_t size)
 {
    // Note from RFC1630: "Sequences which start with a percent
    // sign but are not followed by two hexadecimal characters
@@ -67,11 +59,10 @@ inline void uriDecode(std::string& res, char* str, int32_t size)
    // last decodable '%' 
   const unsigned char * const SRC_LAST_DEC = SRC_END - 2;
 
-  res.resize(size);
-  size_t resSize = 0;
-  char * pEnd = &res[0];
+  outSize = 0;
+  char * pEnd = res;
 
-  while (pSrc < SRC_LAST_DEC)
+  while (pSrc < SRC_LAST_DEC && outSize < capacity)
   {
     if (*pSrc == '%')
     {
@@ -81,29 +72,32 @@ inline void uriDecode(std::string& res, char* str, int32_t size)
       {
         *pEnd++ = (dec1 << 4) + dec2;
         pSrc += 3;
-        ++ resSize;
+        ++ outSize;
         continue;
       }
     } else if (*pSrc == '+') {
       *pEnd = ' ';
       ++ pEnd;
       ++ pSrc;
-      ++ resSize;
+      ++ outSize;
       continue;
     }
 
-
     *pEnd++ = *pSrc++;
-    ++ resSize;
+    ++ outSize;
   }
 
-     // the last 2- chars
-  while (pSrc < SRC_END) {
+  // the last 2- chars
+  while (pSrc < SRC_END && outSize < capacity) {
     *pEnd++ = *pSrc++;
-    ++ resSize;
+    ++ outSize;
   }
 
-  res.resize(resSize);
+  if (pSrc < SRC_END) {
+    return false;
+  }
+
+  return true;
 }
 
 } // namespace db

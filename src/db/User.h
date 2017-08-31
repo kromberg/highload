@@ -28,8 +28,8 @@ struct User
   int32_t birth_date;
   char gender;
 
-  char buffer_[1024];
-  int bufferSize_ = 0;
+  /*char buffer_[512];
+  int bufferSize_ = 0;*/
 
   std::unordered_map<int32_t, Visit*> visits_;
 
@@ -44,13 +44,10 @@ struct User
     const int32_t id,
     const rapidjson::Value& jsonVal);
   User(const User& user);
+  User(User&& user);
   User& operator=(User&& user);
-  void cache(const int32_t id);
-  bool update(const rapidjson::Value& jsonVal);
-  std::string* getJson(const int32_t id);
-  void getJson(ConstBuffer& buffer, const int32_t id);
+  void getJson(Buffer& buffer, const int32_t id);
   Result getJsonVisits(Buffer& buffer, char* params, const int32_t paramsSize) const;
-  Result getJsonVisits(std::string& result, char* params, const int32_t paramsSize) const;
   void dump() const;
 };
 } // namespace db

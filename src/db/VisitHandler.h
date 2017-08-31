@@ -24,7 +24,7 @@ struct VisitHandler {
     VISITED_AT,
     MARK,
   };
-  static std::unordered_map<std::string, State> strToState;
+  static std::unordered_map<in_place_string, State> strToState;
 
   State state_;
   uint16_t filledFields_;
@@ -109,7 +109,7 @@ struct VisitHandler {
   bool String(const char* str, SizeType length, bool copy) { return false; }
   bool StartObject() { return true; }
   bool Key(const char* str, SizeType length, bool copy) {
-    auto it = strToState.find(std::string(str, length));
+    auto it = strToState.find(in_place_string(str, length));
     if (strToState.end() == it) {
       return false;
     }

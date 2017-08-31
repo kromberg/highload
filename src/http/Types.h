@@ -3,7 +3,7 @@
 
 #include <rapidjson/document.h>
 
-#include <db/Utils.h>
+#include <common/Types.h>
 
 namespace http
 {
@@ -14,6 +14,7 @@ enum class Type
   GET,
   MAX,
 };
+
 enum class Table
 {
   NONE = 0,
@@ -26,16 +27,18 @@ enum class Table
 
 enum HTTPCode
 {
-  NO_ERROR = 0,
   OK = 200,
   BAD_REQ = 400,
   NOT_FOUND = 404,
 };
 
+using common::ConstBuffer;
+using common::Buffer;
+
 struct Response
 {
-  db::ConstBuffer constBuffer;
-  db::Buffer buffer;
+  ConstBuffer constBuffer;
+  Buffer buffer;
   char arr[8 * 1024];
   Response()
   {
@@ -46,18 +49,18 @@ struct Response
 
 struct Request
 {
-  Type type_ = Type::NONE;
-  Table table1_ = Table::NONE;
-  Table table2_ = Table::NONE;
-  int32_t id_ = -1;
-  char* params_ = nullptr;
-  int32_t paramsSize_ = 0;
+  Type type = Type::NONE;
+  Table table1 = Table::NONE;
+  Table table2 = Table::NONE;
+  int32_t id = -1;
+  char* params = nullptr;
+  int32_t paramsSize = 0;
 
-  bool hasContentType_ = false;
-  int32_t contentLength_ = 0;
+  bool hasContentType = false;
+  int32_t contentLength = 0;
 
-  const char* content_ = nullptr;
-  bool keepalive_ = false;
+  const char* content = nullptr;
+  bool keepalive = false;
 };
 } // namespace http
 

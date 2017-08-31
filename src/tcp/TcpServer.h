@@ -3,6 +3,9 @@
 
 #include <cstdint>
 #include <thread>
+#include <vector>
+
+#include <sys/epoll.h>
 
 #include <common/Types.h>
 
@@ -14,16 +17,18 @@ using common::Result;
 
 class TcpServer
 {
-private:
+protected:
   Socket sock_;
-  std::thread acceptThread_;
 
-private:
-  void acceptFunc();
-  virtual void acceptSocket(SocketWrapper sock) = 0;
+protected:
+  int epoll_create(int size);
+  int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
+  int epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask);
+  int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
 
 protected:
   virtual Result doStart() { return Result::SUCCESS; }
+  virtual Result doStop() { return Result::SUCCESS; }
 public:
   TcpServer();
   virtual ~TcpServer();

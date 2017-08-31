@@ -26,8 +26,8 @@ struct Visit
   Location* location_;
   User* user_;
 
-  char buffer_[1024];
-  int bufferSize_ = 0;
+  /*char buffer_[256];
+  int bufferSize_ = 0;*/
 
   Visit();
   Visit(
@@ -46,9 +46,8 @@ struct Visit
     const rapidjson::Value& jsonVal);
   Visit(const Visit& visit);
   Visit& operator=(Visit&& visit);
-  void cache(const int32_t id);
-  bool update(const int32_t locationId, const int32_t userId, const rapidjson::Value& jsonVal);
-  void getJson(ConstBuffer& buffer, const int32_t id);
+  //void cache(const int32_t id);
+  void getJson(Buffer& buffer, const int32_t id);
   void dump() const;
 };
 } // namespace db

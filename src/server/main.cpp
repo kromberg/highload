@@ -1,6 +1,6 @@
 #include <memory>
 #include <cstdint>
-#include <iostream>
+#include <vector>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +16,7 @@
 volatile bool running = false;
 void sig_handler(int signum)
 {
-  LOG(stderr, "Received signal %d\n", signum);
+  LOG_CRITICAL(stderr, "Received signal %d\n", signum);
   running = false;
 }
 
@@ -26,14 +26,24 @@ int main(int argc, char* argv[])
   signal(SIGINT, sig_handler);
   signal(SIGTERM, sig_handler);
 
+  size_t serversCount = 4;
+  if (argc >= 2) {
+    serversCount = std::stoul(argv[1]);
+  }
+
   db::StoragePtr storage(new db::Storage);
   storage->load("/tmp/data/data.zip");
   db::Storage::loadTime("/tmp/data/options.txt");
 
-  http::HttpServer server(storage);
-  Result res = server.start();
-  if (Result::SUCCESS == res) {
-    running = true;
+  running = true;
+  std::vector<http::HttpServer*> servers(serversCount, nullptr);
+  for (auto server : servers) {
+    server = new http::HttpServer(storage);
+    Result res = server->start();
+    if (Result::SUCCESS != res) {
+      running = false;
+      break;
+    }
   }
 
   while (running) {
@@ -41,7 +51,12 @@ int main(int argc, char* argv[])
     common::TimeProfiler::print();
   }
 
-  server.stop();
+  for (auto server : servers) {
+    if (server) {
+      server->stop();
+      delete server;
+    }
+  }
 
   return 0;
 }

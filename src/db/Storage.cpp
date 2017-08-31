@@ -3,7 +3,6 @@
 #include <fstream>
 
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
 
 #include <rapidjson/document.h>
@@ -19,7 +18,7 @@ namespace db
 {
 struct tm Storage::time_;
 
-std::unordered_map<std::string, UserHandler::State> UserHandler::strToState =
+std::unordered_map<in_place_string, UserHandler::State> UserHandler::strToState =
 {
   { "id" ,          UserHandler::State::ID},
   { "email" ,       UserHandler::State::EMAIL},
@@ -29,7 +28,7 @@ std::unordered_map<std::string, UserHandler::State> UserHandler::strToState =
   { "gender" ,      UserHandler::State::GENDER},
 };
 
-std::unordered_map<std::string, LocationHandler::State> LocationHandler::strToState =
+std::unordered_map<in_place_string, LocationHandler::State> LocationHandler::strToState =
 {
   { "id" ,          LocationHandler::State::ID},
   { "place" ,       LocationHandler::State::PLACE},
@@ -38,7 +37,7 @@ std::unordered_map<std::string, LocationHandler::State> LocationHandler::strToSt
   { "distance" ,    LocationHandler::State::DISTANCE},
 };
 
-std::unordered_map<std::string, VisitHandler::State> VisitHandler::strToState =
+std::unordered_map<in_place_string, VisitHandler::State> VisitHandler::strToState =
 {
   { "id" ,          VisitHandler::State::ID},
   { "location" ,    VisitHandler::State::LOCATION},
@@ -147,6 +146,8 @@ Result Storage::load(const std::string& path)
         std::forward_as_tuple(visit));
     });
 
+  LOG_CRITICAL(stderr, "All information was loaded from files\n");
+
   return Result::SUCCESS;
 }
 
@@ -225,6 +226,8 @@ Result Storage::addUser(const char* content)
 {
   using namespace rapidjson;
 
+  START_PROFILER("addUser");
+
   User user;
   UserHandler handler(user);
   Reader reader;
@@ -249,6 +252,7 @@ Result Storage::addUser(const char* content)
 Result Storage::updateUser(const int32_t id, const char* content)
 {
   using namespace rapidjson;
+  START_PROFILER("updateUser");
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
   if (users_.end() == it) {
@@ -276,6 +280,8 @@ Result Storage::updateUser(const int32_t id, const char* content)
 Result Storage::addLocation(const char* content)
 {
   using namespace rapidjson;
+
+  START_PROFILER("addLocation");
   Location location;
   LocationHandler handler(location);
   Reader reader;
@@ -299,6 +305,8 @@ Result Storage::addLocation(const char* content)
 
 Result Storage::updateLocation(const int32_t id, const char* content)
 {
+  START_PROFILER("updateLocation");
+
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);
   if (locations_.end() == it) {
@@ -327,6 +335,7 @@ Result Storage::updateLocation(const int32_t id, const char* content)
 Result Storage::addVisit(const char* content)
 {
   using namespace rapidjson;
+  START_PROFILER("addVisit");
   Visit visit;
   VisitHandler handler(visit, usersGuard_, users_, locationsGuard_, locations_);
   Reader reader;
@@ -356,15 +365,13 @@ Result Storage::addVisit(const char* content)
     std::forward_as_tuple(handler.id_),
     std::forward_as_tuple(visitPtr));
 
-  LOG(stderr, "New visit has been added\n");
-
   return Result::SUCCESS;
 }
 
 Result Storage::updateVisit(const int32_t id, const char* content)
 {
   using namespace rapidjson;
-
+  START_PROFILER("updateVisit");
   tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, true);
   auto it = visits_.find(id);
   if (visits_.end() == it) {
@@ -408,7 +415,7 @@ Result Storage::updateVisit(const int32_t id, const char* content)
   return Result::SUCCESS;
 }
 
-Result Storage::getUser(ConstBuffer& buffer, const int32_t id)
+Result Storage::getUser(Buffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(usersGuard_, false);
   auto it = users_.find(id);
@@ -419,7 +426,7 @@ Result Storage::getUser(ConstBuffer& buffer, const int32_t id)
   return Result::SUCCESS;
 }
 
-Result Storage::getLocation(ConstBuffer& buffer, const int32_t id)
+Result Storage::getLocation(Buffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(locationsGuard_, false);
   auto it = locations_.find(id);
@@ -430,7 +437,7 @@ Result Storage::getLocation(ConstBuffer& buffer, const int32_t id)
   return Result::SUCCESS;
 }
 
-Result Storage::getVisit(ConstBuffer& buffer, const int32_t id)
+Result Storage::getVisit(Buffer& buffer, const int32_t id)
 {
   tbb::spin_rw_mutex::scoped_lock l(visitsGuard_, false);
   auto it = visits_.find(id);

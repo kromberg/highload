@@ -23,6 +23,7 @@ class TimeProfiler
 private:
   static tbb::spin_rw_mutex guard_;
   static std::unordered_map<std::string, Operation> operations_;
+  static std::unordered_map<std::string, Operation> instantaneousOperations_;
 
   std::string op_;
   bool running_ = true;
@@ -47,18 +48,34 @@ public:
     struct timespec end;
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     tbb::spin_rw_mutex::scoped_lock l(guard_, true);
-    Operation& operation = operations_[op_];
-    ++ operation.callsCount;
-    operation.timeNsec += ((end.tv_sec - ts_.tv_sec) * 1000000000UL + end.tv_nsec - ts_.tv_nsec);
+    {
+      Operation& operation = operations_[op_];
+      ++ operation.callsCount;
+      operation.timeNsec += ((end.tv_sec - ts_.tv_sec) * 1000000000UL + end.tv_nsec - ts_.tv_nsec);
+    }
+    {
+      Operation& operation = instantaneousOperations_[op_];
+      ++ operation.callsCount;
+      operation.timeNsec += ((end.tv_sec - ts_.tv_sec) * 1000000000UL + end.tv_nsec - ts_.tv_nsec);
+    }
     running_ = false;
   }
 
   static void print()
   {
-    tbb::spin_rw_mutex::scoped_lock l(guard_, false);
+#ifdef PROFILER
+    tbb::spin_rw_mutex::scoped_lock l(guard_, true);
+    LOG_CRITICAL(stderr, "\n\n");
+    LOG_CRITICAL(stderr, "Stats\n");
     for (const auto& op : operations_) {
-      LOG_CRITICAL(stderr, "%20s -> %10lu calls %20lu nsecs\n", op.first.c_str(), op.second.callsCount, op.second.timeNsec);
+      LOG_CRITICAL(stderr, "%20s -> %10lu calls %15lu nsecs %10lu nsecs/call\n", op.first.c_str(), op.second.callsCount, op.second.timeNsec, op.second.timeNsec / op.second.callsCount);
     }
+    LOG_CRITICAL(stderr, "Instantaneous Stats\n");
+    for (const auto& op : instantaneousOperations_) {
+      LOG_CRITICAL(stderr, "%20s -> %10lu calls %15lu nsecs %10lu nsecs/call\n", op.first.c_str(), op.second.callsCount, op.second.timeNsec, op.second.timeNsec / op.second.callsCount);
+    }
+    instantaneousOperations_.clear();
+#endif
   }
 };
 

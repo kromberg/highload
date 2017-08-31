@@ -55,7 +55,7 @@ StateMachine::Handler StateMachine::handlersMatrix_[size_t(Type::MAX)][size_t(Ta
 
 HTTPCode StateMachine::addOrUpdateUser(Response& resp, db::Storage& storage, Request& req)
 {
-  if (-1 == req.id_) {
+  if (-1 == req.id) {
     return addUser(resp, storage, req);
   } else {
     return updateUser(resp, storage, req);
@@ -64,7 +64,7 @@ HTTPCode StateMachine::addOrUpdateUser(Response& resp, db::Storage& storage, Req
 
 HTTPCode StateMachine::addOrUpdateLocation(Response& resp, db::Storage& storage, Request& req)
 {
-  if (-1 == req.id_) {
+  if (-1 == req.id) {
     return addLocation(resp, storage, req);
   } else {
     return updateLocation(resp, storage, req);
@@ -73,7 +73,7 @@ HTTPCode StateMachine::addOrUpdateLocation(Response& resp, db::Storage& storage,
 
 HTTPCode StateMachine::addOrUpdateVisit(Response& resp, db::Storage& storage, Request& req)
 {
-  if (-1 == req.id_) {
+  if (-1 == req.id) {
     return addVisit(resp, storage, req);
   } else {
     return updateVisit(resp, storage, req);
@@ -82,7 +82,7 @@ HTTPCode StateMachine::addOrUpdateVisit(Response& resp, db::Storage& storage, Re
 
 HTTPCode StateMachine::addUser(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.addUser(req.content_);
+  Result res = storage.addUser(req.content);
   if (Result::SUCCESS != res) {
     return HTTPCode::BAD_REQ;
   }
@@ -92,7 +92,7 @@ HTTPCode StateMachine::addUser(Response& resp, db::Storage& storage, Request& re
 
 HTTPCode StateMachine::addLocation(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.addLocation(req.content_);
+  Result res = storage.addLocation(req.content);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -104,7 +104,7 @@ HTTPCode StateMachine::addLocation(Response& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::addVisit(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.addVisit(req.content_);
+  Result res = storage.addVisit(req.content);
   if (Result::SUCCESS != res) {
     return HTTPCode::BAD_REQ;
   }
@@ -114,7 +114,7 @@ HTTPCode StateMachine::addVisit(Response& resp, db::Storage& storage, Request& r
 
 HTTPCode StateMachine::updateUser(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.updateUser(req.id_, req.content_);
+  Result res = storage.updateUser(req.id, req.content);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -126,7 +126,7 @@ HTTPCode StateMachine::updateUser(Response& resp, db::Storage& storage, Request&
 
 HTTPCode StateMachine::updateLocation(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.updateLocation(req.id_, req.content_);
+  Result res = storage.updateLocation(req.id, req.content);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -138,7 +138,7 @@ HTTPCode StateMachine::updateLocation(Response& resp, db::Storage& storage, Requ
 
 HTTPCode StateMachine::updateVisit(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.updateVisit(req.id_, req.content_);
+  Result res = storage.updateVisit(req.id, req.content);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -150,7 +150,7 @@ HTTPCode StateMachine::updateVisit(Response& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::getUser(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getUser(resp.constBuffer, req.id_);
+  Result res = storage.getUser(resp.buffer, req.id);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -162,7 +162,7 @@ HTTPCode StateMachine::getUser(Response& resp, db::Storage& storage, Request& re
 
 HTTPCode StateMachine::getLocation(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getLocation(resp.constBuffer, req.id_);
+  Result res = storage.getLocation(resp.buffer, req.id);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -174,7 +174,7 @@ HTTPCode StateMachine::getLocation(Response& resp, db::Storage& storage, Request
 
 HTTPCode StateMachine::getVisit(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getVisit(resp.constBuffer, req.id_);
+  Result res = storage.getVisit(resp.buffer, req.id);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -186,7 +186,7 @@ HTTPCode StateMachine::getVisit(Response& resp, db::Storage& storage, Request& r
 
 HTTPCode StateMachine::getUserVisits(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getUserVisits(resp.buffer, req.id_, req.params_, req.paramsSize_);
+  Result res = storage.getUserVisits(resp.buffer, req.id, req.params, req.paramsSize);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -197,7 +197,7 @@ HTTPCode StateMachine::getUserVisits(Response& resp, db::Storage& storage, Reque
 
 HTTPCode StateMachine::getLocationAvgScore(Response& resp, db::Storage& storage, Request& req)
 {
-  Result res = storage.getLocationAvgScore(resp.buffer, req.id_, req.params_, req.paramsSize_);
+  Result res = storage.getLocationAvgScore(resp.buffer, req.id, req.params, req.paramsSize);
   if (Result::NOT_FOUND == res) {
     return HTTPCode::NOT_FOUND;
   } else if (Result::SUCCESS != res) {
@@ -208,7 +208,7 @@ HTTPCode StateMachine::getLocationAvgScore(Response& resp, db::Storage& storage,
 
 StateMachine::Handler StateMachine::getHandler(const Request& req)
 {
-  return handlersMatrix_[size_t(req.type_)][size_t(req.table1_)][size_t(req.table2_)];
+  return handlersMatrix_[size_t(req.type)][size_t(req.table1)][size_t(req.table2)];
 }
 
 } // namespace http

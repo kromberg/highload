@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <ctime>
 #include <time.h>
+#include <cmath>
 
 #include <rapidjson/stringbuffer.h>
 
@@ -33,7 +34,6 @@ Location::Location(
   country = std::string(jsonVal["country"].GetString());
   city = std::string(jsonVal["city"].GetString());
   distance = jsonVal["distance"].GetInt();
-  cache(id);
 }
 
 Location::Location(const Location& location):
@@ -49,35 +49,19 @@ Location& Location::operator=(Location&& location)
   country = std::move(location.country);
   city = std::move(location.city);
   distance = std::move(location.distance);
-  bufferSize_ = 0;
   return *this;
 }
 
-void Location::cache(const int32_t id)
+void Location::getJson(Buffer& buffer, const int32_t id)
 {
   int size =
-    snprintf(buffer_ + DB_RESPONSE_200_SIZE, sizeof(buffer_) - DB_RESPONSE_200_SIZE,
+    snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, buffer.capacity - DB_RESPONSE_200_SIZE,
       "{\"id\":%d,\"place\":\"%s\",\"country\":\"%s\",\"city\":\"%s\",\"distance\":%d}",
       id, place.c_str(), country.c_str(), city.c_str(), distance);
-  bufferSize_ = snprintf(buffer_, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
-  buffer_[bufferSize_ - 1] = '\n';
-  bufferSize_ += size;
-}
-
-void Location::getJson(ConstBuffer& buffer, const int32_t id)
-{
-  if (0 == bufferSize_) {
-    cache(id);
-  }
-  buffer.buffer = buffer_;
-  buffer.size = bufferSize_;
-}
-
-static std::string to_string(const double val)
-{
-  std::ostringstream ss;
-  ss << std::setprecision(6) << val;
-  return ss.str();
+  buffer.size = snprintf(buffer.buffer + DB_RESPONSE_200_PART1_SIZE, DB_RESPONSE_200_PART2_SIZE, DB_RESPONSE_200_PART2, size);
+  buffer.size += DB_RESPONSE_200_PART1_SIZE;
+  buffer.buffer[buffer.size - 1] = '\n';
+  buffer.size += size;
 }
 
 Result Location::getJsonAvgScore(Buffer& buffer, char* params, const int32_t paramsSize) const
@@ -163,15 +147,16 @@ Result Location::getJsonAvgScore(Buffer& buffer, char* params, const int32_t par
     }
   }
 
-  double avg = 0;
+  long double avg = 0;
   if (count) {
-    avg = (1.0 * sum) / count;
+    avg = roundl(((long double)(sum * 100000)) / count) / 100000;
   }
 
   int size =
     snprintf(buffer.buffer + DB_RESPONSE_200_SIZE, buffer.capacity - DB_RESPONSE_200_SIZE,
-      "{\"avg\":%s}", db::to_string(avg).c_str());
-  buffer.size = snprintf(buffer.buffer, DB_RESPONSE_200_SIZE, DB_RESPONSE_200, size);
+      "{\"avg\":%.5Lf}", avg);
+  buffer.size = snprintf(buffer.buffer + DB_RESPONSE_200_PART1_SIZE, DB_RESPONSE_200_PART2_SIZE, DB_RESPONSE_200_PART2, size);
+  buffer.size += DB_RESPONSE_200_PART1_SIZE;
   buffer.buffer[buffer.size - 1] = '\n';
   buffer.size += size;
   return Result::SUCCESS;
