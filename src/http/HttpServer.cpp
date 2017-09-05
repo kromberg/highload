@@ -460,7 +460,7 @@ void HttpServer::eventsThreadFunc()
   int nfds;
 
   do {
-    nfds = epoll_wait(epollFd_, events, MAX_EVENTS, -1);
+    nfds = epoll_wait(epollFd_, events, MAX_EVENTS, 0);
     int i;
     for (i = 0; i < nfds; ++i) {
       if (events[i].data.fd == int(sock_)) {
